@@ -1,0 +1,13 @@
+# environment.yml
+name: hl7_fhir_env
+channels: [conda-forge]
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - -e .
+      - pytest
+      - pytest-cov
+      - mypy
+      - ruff
+      
