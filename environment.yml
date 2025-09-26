@@ -1,13 +1,17 @@
 # environment.yml
 name: hl7_fhir_env
-channels: [conda-forge]
+channels:
+  - conda-forge
 dependencies:
   - python=3.11
   - pip
   - pip:
+      # Install the project itself in editable mode
       - -e .
-      - pytest
-      - pytest-cov
-      - mypy
-      - ruff
-      
+
+      # Development/test dependencies
+      - pytest>=8.2
+      - pytest-cov>=5.0
+      - mypy>=1.11
+      - ruff>=0.6.0
+      - types-PyYAML

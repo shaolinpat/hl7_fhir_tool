@@ -1,13 +1,49 @@
 # .gitignore
+
+# Byte-compiled / cache files
 __pycache__/
-*.pyc
-*.pyo
-*.DS_Store
-.mypy_cache/
-.ruff_cache/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Unit test / coverage reports
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
-dist/
-build/
-*.egg-info/
+.tox/
+.nox/
+
+# test data
+tests/data
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+.pyre/
+
+# Editors / IDEs
+*.swp
+*~
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/

@@ -1,0 +1,30 @@
+# .coveragerc
+[run]
+branch = True
+source =
+    src/hl7_fhir_tool
+omit =
+    */tests/*
+    */site-packages/*
+    */__pycache__/*
+    */.venv/*
+    */.conda/*
+
+[report]
+show_missing = True
+precision = 2
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    if typing\.TYPE_CHECKING:
+    @overload
+    @abc\.abstractmethod
+
+[paths]
+source =
+    src/hl7_fhir_tool
+    hl7_fhir_tool
+
+[html]
+directory = htmlcov
+title = hl7_fhir_tool coverage
