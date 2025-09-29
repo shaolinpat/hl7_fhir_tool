@@ -4,7 +4,6 @@ tests for hls_fhir_tool.logging_utils
 """
 
 import io
-import logging
 import pytest
 
 from hl7_fhir_tool.logging_utils import configure_logging

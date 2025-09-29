@@ -61,12 +61,25 @@ src = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
+# Only type-check our package; keep strict here.
+files = ["src/hl7_fhir_tool"]
 strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 disallow_any_generics = true
-no_implicit_optional = true
-check_untyped_defs = true
+# no_implicit_optional = true
+# check_untyped_defs = true
+# We don't type-check tests to avoid polluting them with annotations.
+exclude = ["^tests/"]
+
+# Let mypy ignore third-party packages that don't ship type info.
+[[tool.mypy.overrides]]
+module = [
+  "hl7apy.*",
+  "lxml.*",
+  "fhir.resources.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

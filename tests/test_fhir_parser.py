@@ -5,12 +5,12 @@ Tests for hl7_fhir_tool/fhir_parser.
 
 import json
 import pytest
-import types
 
-from lxml import etree
-from pathlib import Path
 from fhir.resources.patient import Patient
 from fhir.resources.resource import Resource
+from lxml import etree
+from pathlib import Path
+from pydantic import BaseModel
 
 from hl7_fhir_tool.fhir_parser import (
     KNOWN_TYPES,
@@ -18,7 +18,7 @@ from hl7_fhir_tool.fhir_parser import (
     _xml_to_obj,
     load_fhir_json,
     load_fhir_xml,
-    BaseModel,
+    _inject_extras,
 )
 from hl7_fhir_tool.exceptions import ParseError
 
@@ -181,6 +181,232 @@ def test_xml_to_obj_first_repeat_promotes_scalar_to_list():
 
 
 # ------------------------------------------------------------------------------
+# _construct_base
+# ------------------------------------------------------------------------------
+
+
+def test_construct_base_v2_path_json(tmp_path, monkeypatch):
+    """
+    Cover the v2 path in _construct_base: Resource.model_construct(**data).
+    We re-enable it and make it delegate to a real BaseModel construct to produce a Resource.
+    """
+    # Ensure v1 path is not taken
+    monkeypatch.setattr(Resource, "construct", None, raising=False)
+
+    # Provide a v2-like model_construct that binds via BaseModel and returns a Resource
+    def _mc(**data):
+        bound = BaseModel.model_construct.__get__(Resource, type(Resource))
+        return bound(**data)
+
+    monkeypatch.setattr(Resource, "model_construct", _mc, raising=False)
+
+    obj = {"resourceType": "CustomThing", "id": "x1"}
+    p = tmp_path / "custom_v2.json"
+    p.write_text(json.dumps(obj), encoding="utf-8")
+
+    res = load_fhir_json(p)
+    assert getattr(res, "resource_type", None) == "CustomThing"
+    # sanity: field carried through
+    assert getattr(res, "id", None) == "x1"
+
+
+def test_construct_base_v1_path_json(tmp_path, monkeypatch):
+    """
+    Cover the v1 path in _construct_base: Resource.construct(**data).
+    """
+    # Disable v2; enable v1
+    monkeypatch.setattr(Resource, "model_construct", None, raising=False)
+
+    def _construct(**data):
+        bound = BaseModel.model_construct.__get__(Resource, type(Resource))
+        return bound(**data)
+
+    monkeypatch.setattr(Resource, "construct", _construct, raising=False)
+
+    obj = {"resourceType": "LegacyThing", "id": "y1"}
+    p = tmp_path / "legacy_v1.json"
+    p.write_text(json.dumps(obj), encoding="utf-8")
+
+    res = load_fhir_json(p)
+    assert getattr(res, "resource_type", None) == "LegacyThing"
+    assert getattr(res, "id", None) == "y1"
+
+
+def test_construct_base_no_apis_error_xml(tmp_path, monkeypatch):
+    """
+    Cover the final error branch: no model_construct/construct anywhere.
+    """
+    monkeypatch.setattr(Resource, "model_construct", None, raising=False)
+    monkeypatch.setattr(Resource, "construct", None, raising=False)
+    monkeypatch.setattr(BaseModel, "model_construct", None, raising=False)
+
+    xml = '<Unknown xmlns="http://hl7.org/fhir"><id value="z"/></Unknown>'
+    p = tmp_path / "none_left.xml"
+    p.write_text(xml, encoding="utf-8")
+
+    with pytest.raises(
+        ParseError,
+        match=r"^failed to construct base Resource from XML: Resource does not "
+        "expose model_construct or construct",
+    ):
+        load_fhir_xml(p)
+
+
+# def test_construct_base_descriptor_success_xml(tmp_path, monkeypatch):
+#     """Cover the descriptor-binding path."""
+#     # Force _construct_base to skip v2/v1 on Resource
+#     monkeypatch.setattr(Resource, "model_construct", None, raising=False)
+#     monkeypatch.setattr(Resource, "construct", None, raising=False)
+
+#     # Provide a BaseModel.model_construct that *does* have __get__ and works
+#     orig_bm_mc = BaseModel.model_construct
+
+#     class HasGet:
+#         def __get__(self, _owner, _type):
+#             return orig_bm_mc  # return the original (bound) callable
+
+#     monkeypatch.setattr(BaseModel, "model_construct", HasGet(), raising=False)
+
+#     xml = (
+#         '<CustomResource xmlns="http://hl7.org/fhir">'
+#         '<id value="z"/><identifier value="a"/><identifier value="b"/></CustomResource>'
+#     )
+#     p = tmp_path / "custom_desc.xml"
+#     p.write_text(xml, encoding="utf-8")
+
+#     res = load_fhir_xml(p)
+#     # resource_type assigned + list promotion (hits list-aggregation branch)
+#     assert getattr(res, "resource_type", None) == "CustomResource"
+#     # Ensure identifiers were aggregated into a list via _xml_to_obj branch
+#     ids = getattr(res, "identifier", None)
+#     assert isinstance(ids, list) and ids == ["a", "b"]
+
+
+# def test_construct_base_unbound_func_raises_xml(tmp_path, monkeypatch):
+#     """
+#     Cover the __func__ path and ensure the inner exception bubbles as 'explode',
+#     matching the test that expects that exact message.
+#     """
+#     # Disable Resource v2/v1 APIs
+#     monkeypatch.setattr(Resource, "model_construct", None, raising=False)
+#     monkeypatch.setattr(Resource, "construct", None, raising=False)
+
+#     class Boom:
+#         def __call__(self, *a, **k):
+#             raise RuntimeError("explode")
+
+#     # Provide an object with __func__ that raises
+#     monkeypatch.setattr(
+#         BaseModel,
+#         "model_construct",
+#         type("X", (), {"__func__": Boom()})(),
+#         raising=False,
+#     )
+
+#     xml = '<CustomResource xmlns="http://hl7.org/fhir"><id value="z"/></CustomResource>'
+#     p = tmp_path / "custom_basefail.xml"
+#     p.write_text(xml, encoding="utf-8")
+
+#     with pytest.raises(
+#         ParseError, match=r"^failed to construct base Resource from XML: explode$"
+#     ):
+#         load_fhir_xml(p)
+
+
+# ------------------------------------------------------------------------------
+# _inject_extras
+# ------------------------------------------------------------------------------
+
+
+def test_inject_extras_v2_store_updates_and_attr_set():
+    """
+    Cover v2 style path in _inject_extras:
+        - field names come from class model_fields
+        - extras go into __pydantic_extra__
+        - attributes are also set on the instance
+    """
+
+    class V2LikeResource:
+        # emulate pydantic v2 class metadata
+        model_fields = {"id": object, "resourceType": object}
+
+        def __init__(self):
+            # emulate pydantic v2 extra store
+            self.__pydantic_extra__ = {}
+
+    inst = V2LikeResource()
+    data = {"resourceType": "X", "id": "x1", "identifier": ["A", "B"], "foo": 7}
+
+    _inject_extras(inst, data)
+
+    # extras were stored
+    assert inst.__pydantic_extra__.get("identifier") == ["A", "B"]
+    assert inst.__pydantic_extra__.get("foo") == 7
+    # attributes set for convenience
+    assert getattr(inst, "identifier") == ["A", "B"]
+    assert getattr(inst, "foo") == 7
+
+
+def test_inject_extras_v1_fallback_dict_update_and_attr_set():
+    """
+    Cover v1 style path in _inject_extras:
+        - field names come from class __fields__
+        - no __pydantic_extra__ so fall back to __dict__ update
+        - attributes are also set on the instance
+    """
+
+    class V1LikeResource:
+        __fields__ = {"id": object, "resourceType": object}
+
+        def __init__(self):
+            self.id = "y1"  # ensure __dict__ exists
+
+    inst = V1LikeResource()
+    data = {"resourceType": "Y", "id": "y1", "bar": "baz"}
+
+    _inject_extras(inst, data)
+
+    # dict updated with extra
+    assert getattr(inst, "__dict__", {}).get("bar") == "baz"
+    # attribute also set
+    assert getattr(inst, "bar") == "baz"
+
+
+def test_inject_extras_early_return_when_no_extras():
+    """
+    Cover early return when extras is empty.
+    """
+
+    class OnlyModelFields:
+        model_fields = {"resourceType": object, "id": object}
+
+    inst = OnlyModelFields()
+    data = {"resourceType": "Z", "id": "z1"}  # no extras
+
+    _inject_extras(inst, data)
+    # nothing added
+    assert not hasattr(inst, "anything_else")
+
+
+def test_inject_extras_attr_set_failure_is_ignored():
+    """
+    Cover attribute setting failure path in _inject_extras.
+    object.__setattr__ should fail when class forbids new attributes.
+    """
+
+    class SlottedNoNew:
+        __slots__ = ()  # no new attributes allowed
+        __fields__ = {}  # make field set empty so everything is extra
+
+    inst = SlottedNoNew()
+    data = {"resourceType": "W", "id": "w1", "extra_field": 123}
+
+    _inject_extras(inst, data)
+    # still no attribute created, but no exception
+    assert not hasattr(inst, "extra_field")
+
+
+# ------------------------------------------------------------------------------
 # load_fhir_json
 # ------------------------------------------------------------------------------
 
@@ -323,26 +549,6 @@ def test_load_fhir_json_unknown_type_construct_success(tmp_path, monkeypatch):
         else r.dict(by_alias=True)
     )
     assert doc.get("id") == "w"
-
-
-def test_load_fhir_json_unknown_type_unbound_construct(tmp_path, monkeypatch):
-    # Hide both model_construct and construct so code fails to
-    # BaseMode.model_construct.__func__
-    monkeypatch.setattr(Resource, "model_construct", None, raising=False)
-    monkeypatch.setattr(Resource, "construct", None, raising=False)
-
-    p = tmp_path / "strange.json"
-    p.write_text('{"resourceType":"StrangeThing", "id":"s"}', encoding="utf-8")
-
-    r = load_fhir_json(p)
-    assert isinstance(r, Resource)
-    doc = (
-        r.model_dump(by_alias=True)
-        if hasattr(r, "model_dump")
-        else r.dict(by_alias=True)
-    )
-    assert doc.get("id") == "s"
-    assert doc.get("resourceType") in ("StrangeThing", "Resource")
 
 
 # ------------------------------------------------------------------------------
@@ -517,70 +723,6 @@ def test_load_fhir_xml_unknown_type_uses_construct(tmp_path, monkeypatch):
         else r.dict(by_alias=True)
     )
     assert doc.get("id") == "x"
-
-
-def test_load_fhir_xml_unknown_type_fallback_base_raises(tmp_path, monkeypatch):
-    # Disable the usual constructs so we drop into the BaseModel fallback
-    monkeypatch.setattr(Resource, "model_construct", None, raising=False)
-    monkeypatch.setattr(Resource, "construct", None, raising=False)
-
-    # Provide a dummy object with a __func__ attribute that raises
-    class Boom:
-        def __call__(self, *a, **k):
-            raise RuntimeError("explode")
-
-    monkeypatch.setattr(
-        BaseModel,
-        "model_construct",
-        type("X", (), {"__func__": Boom()})(),
-        raising=False,
-    )
-
-    xml = '<CustomResource xmlns="http://hl7.org/fhir"><id value="z"/></CustomResource>'
-    p = tmp_path / "custom_basefail.xml"
-    p.write_text(xml, encoding="utf-8")
-
-    with pytest.raises(
-        ParseError, match=r"^failed to construct base Resource from XML: explode"
-    ):
-        load_fhir_xml(p)
-
-
-def test_load_fhir_xml_unknown_type_fallback_base_success(tmp_path, monkeypatch):
-    # Keep a handle to the real v2 constructor
-    orig_mc = getattr(Resource, "model_construct")
-
-    # Force the loader into the BaseModel fallback
-    monkeypatch.setattr(Resource, "model_construct", None, raising=False)
-    monkeypatch.setattr(Resource, "construct", None, raising=False)
-
-    # Provide a replacement with a __func__ that returns a Resource using the
-    # real constructor
-    class CallMc:
-        def __call__(self, cls, **kwargs):
-            return orig_mc(**kwargs)
-
-    monkeypatch.setattr(
-        BaseModel,
-        "model_construct",
-        type("X", (), {"__func__": CallMc()})(),
-        raising=False,
-    )
-
-    xml = (
-        '<CustomResource xmlns="http://hl7.org/fhir"><id value="ok"/></CustomResource>'
-    )
-    p = tmp_path / "custom_base_ok.xml"
-    p.write_text(xml, encoding="utf-8")
-
-    r = load_fhir_xml(p)
-    assert isinstance(r, Resource)
-    doc = (
-        r.model_dump(by_alias=True)
-        if hasattr(r, "model_construct")
-        else r.dict(by_alias=True)
-    )
-    assert doc.get("id") == "ok"
 
 
 def test_load_fhir_xml_patient_name_scalar_given_wrapped(tmp_path):

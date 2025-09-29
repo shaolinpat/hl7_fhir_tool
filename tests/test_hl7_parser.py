@@ -3,8 +3,6 @@
 Tests for hl7_fhir_tool.hl7_parser.
 """
 
-from pathlib import Path
-
 import pytest
 from hl7apy.core import Message
 

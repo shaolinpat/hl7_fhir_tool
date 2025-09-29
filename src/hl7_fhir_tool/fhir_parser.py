@@ -10,7 +10,7 @@ the base `Resource` model.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Mapping, Type
+from typing import Any, Dict, Mapping, Type, TypeVar, cast
 
 import json
 from lxml import etree
@@ -18,8 +18,12 @@ from fhir.resources.resource import Resource
 from fhir.resources.patient import Patient
 from fhir.resources.observation import Observation
 from fhir.resources.bundle import Bundle
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from .exceptions import ParseError
+
+# ------------------------------------------------------------------------------
+# globals
+# ------------------------------------------------------------------------------
 
 # Known FHIR resource classes you want first-class parsing for.
 # Extend this as needed.
@@ -29,10 +33,137 @@ KNOWN_TYPES: Mapping[str, Type[Resource]] = {
     "Bundle": Bundle,
 }
 
+# Typed helper for constructing concrete Resource subclasses.
+R = TypeVar("R", bound=Resource)
+
 
 # ------------------------------------------------------------------------------
 # helpers
 # ------------------------------------------------------------------------------
+
+
+def _construct_known(cls: Type[R], data: Dict[str, Any]) -> R:
+    """
+    Build and validate a concrete FHIR Resource instance.
+
+    Parameters
+    ----------
+    cls : Type[R]
+        A subclass of `fhir.resources.resource.Resource` corresponding to a known
+        resource type (e.g., `Patient`, `Observation`, `Bundle`).
+    data : Dict[str, Any]
+        JSON-like dictionary representation of the resource to instantiate.
+
+    Returns
+    -------
+    R
+        A validated instance of the specified Resource subclass.
+
+    Raises
+    ------
+    pydantic.ValidationError
+        If `data` does not conform to the FHIR schema for the given resource type.
+
+    Notes
+    -----
+    This helper exists to give mypy a precise return type (R) when constructing
+    concrete FHIR models. Runtime behavior is identical to calling `cls(**data)`.
+    """
+    res = cls(**data)  # pydantic validation at runtime
+    return res  # precise type via TypeVar R
+
+
+def _construct_base(data: Dict[str, Any]) -> Resource:
+    """
+    Construct a base Resource WITHOUT validation, preserving fields as-is.
+
+    Works with pydantic v2 (`model_construct`) and v1 (`construct`). If neither
+    API is available on the concrete `Resource` model in this environment,
+    a ParseError is raised.
+
+    Parameters
+    ----------
+    data : Dict[str, Any]
+        JSON-like dictionary (must include "resourceType").
+
+    Returns
+    -------
+    Resource
+        A base `Resource` instance created without validation.
+
+    Raises
+    ------
+    ParseError
+        If no compatible construction API is available.
+    """
+    # Prefer Pydantic v2 API if available on the concrete model
+    mc = getattr(Resource, "model_construct", None)
+    if callable(mc):
+        return cast(Resource, mc(**data))
+
+    # Fallback: v1 API (may be absent in some shims)
+    cc = getattr(Resource, "construct", None)
+    if callable(cc):
+        return cast(Resource, cc(**data))
+
+    # If neither API exists, bail with a clear error.
+    raise ParseError("Resource does not expose model_construct or construct")
+
+
+def _inject_extras(res: Resource, data: Dict[str, Any]) -> None:
+    """
+    Preserve unknown fields from the original payload on a base Resource.
+
+    Parameters
+    ----------
+    res : Resource
+        The base `Resource` instance created without validation.
+    data : Dict[str, Any]
+        Original JSON/XML dictionary representation of the resource.
+
+    Notes
+    -----
+    This helper is only applied for *unknown* resource types, where schema
+    validation is bypassed. It ensures fields not defined on the base
+    `Resource` model are retained for serialization and attribute access:
+
+    - **Pydantic v2**:
+        Unknown keys are added to ``__pydantic_extra__`` so they appear in
+        ``model_dump`` outputs.
+    - **Pydantic v1**:
+        Keys are injected into the instance ``__dict__``.
+
+    In both cases, attributes are also set on the instance (via
+    ``object.__setattr__``) so ``res.foo`` works for unknown keys like
+    ``identifier`` on custom resource types.
+    """
+    cls = type(res)
+    # Probe field names from class-level metadata (avoids v2 instance deprecation)
+    model_fields = getattr(cls, "model_fields", None)  # v2
+    if isinstance(model_fields, dict):
+        field_names = set(model_fields.keys())
+    else:
+        v1_fields = getattr(cls, "__fields__", None)  # v1
+        field_names = set(v1_fields.keys()) if isinstance(v1_fields, dict) else set()
+
+    extras = {k: v for k, v in data.items() if k not in field_names}
+    if not extras:
+        return
+
+    extra_store = getattr(res, "__pydantic_extra__", None)
+    if isinstance(extra_store, dict):
+        extra_store.update(extras)
+    else:
+        d = getattr(res, "__dict__", None)
+        if isinstance(d, dict):
+            d.update(extras)
+
+    # Attribute access convenience (best-effort; ignore failures)
+    for k, v in extras.items():
+        try:
+            object.__setattr__(res, k, v)
+        except Exception:
+            pass
 
 
 def _ensure_file(path: Path) -> None:
@@ -50,7 +181,7 @@ def _local(tag: str) -> str:
     return tag.split("}", 1)[1] if "}" in tag else tag
 
 
-def _xml_to_obj(elem) -> Any:
+def _xml_to_obj(elem: Any) -> Any:
     """
     Convert a FHIR XML element subtree into a minimal JSON-like object.
 
@@ -158,13 +289,13 @@ def load_fhir_json(path: Path) -> Resource:
         raise ParseError("FHIR JSON must be an object at the top level")
 
     rtype = obj.get("resourceType")
-    cls = KNOWN_TYPES.get(str(rtype))
+    cls = KNOWN_TYPES.get(str(rtype)) if rtype is not None else None
 
     if cls is not None:
         # Known type: validate
         try:
-            res = cls(**obj)  # pydantic validation
-            _ensure_resource_type_attr(res, str(rtype) if rtype else None)
+            res = _construct_known(cls, obj)  # pydantic validation
+            _ensure_resource_type_attr(res, str(rtype))
             return res
         except ValidationError as e:
             raise ParseError(f"FHIR JSON validation error: {e}") from e
@@ -173,23 +304,9 @@ def load_fhir_json(path: Path) -> Resource:
 
     # Unknown type: construct base Resource WITHOUT validation, preserving fields as-is
     try:
-        # Prefer Pydantic v2 API if available on the model
-        mc = getattr(Resource, "model_construct", None)
-        if callable(mc):
-            res = mc(**obj)  # pydantic v2
-            _ensure_resource_type_attr(res, str(rtype) if rtype else None)
-            return res
-
-        # Fallback: v1 API (may raise under v2 shims)
-        cc = getattr(Resource, "construct", None)
-        if callable(cc):
-            res = cc(**obj)  # pydantic v1
-            _ensure_resource_type_attr(res, str(rtype) if rtype else None)
-            return res
-
-        # If neither API exists, try the unbound v2 construct directly
-        res = BaseModel.model_construct.__func__(Resource, **obj)
-        _ensure_resource_type_attr(res, str(rtype) if rtype else None)
+        res = _construct_base(obj)
+        _inject_extras(res, obj)
+        _ensure_resource_type_attr(res, str(rtype) if rtype is not None else None)
         return res
     except Exception as e:
         raise ParseError(
@@ -269,7 +386,7 @@ def load_fhir_xml(path: Path) -> Resource:
     cls = KNOWN_TYPES.get(resource_type)
     if cls is not None:
         try:
-            res = cls(**data)
+            res = _construct_known(cls, data)
             _ensure_resource_type_attr(res, resource_type)
             return res
         except ValidationError as e:
@@ -279,17 +396,8 @@ def load_fhir_xml(path: Path) -> Resource:
 
     # Unknown resource type: construct base Resource without validation.
     try:
-        mc = getattr(Resource, "model_construct", None)
-        if callable(mc):
-            res = mc(**data)
-            _ensure_resource_type_attr(res, resource_type)
-            return res
-        cc = getattr(Resource, "construct", None)
-        if callable(cc):
-            res = cc(**data)
-            _ensure_resource_type_attr(res, resource_type)
-            return res
-        res = BaseModel.model_construct.__func__(Resource, **data)
+        res = _construct_base(data)
+        _inject_extras(res, data)
         _ensure_resource_type_attr(res, resource_type)
         return res
     except Exception as e:

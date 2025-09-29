@@ -10,16 +10,29 @@ Provides:
 
 from __future__ import annotations
 
-from typing import Dict, List, Type
+from typing import Callable, Dict, List, Type, TypeVar
 from hl7apy.core import Message
 
 from .base import Transformer
+
+
+# ------------------------------------------------------------------------------
+# globals
+# ------------------------------------------------------------------------------
+
+# Type variable for the decorator to preserve the class type
+T = TypeVar("T", bound=Type[Transformer])
 
 # Map HL7 event string (e.g., "ADT^A01") to a transformer class.
 _REGISTRY: Dict[str, Type[Transformer]] = {}
 
 
-def register(event: str):
+# ------------------------------------------------------------------------------
+# methods
+# ------------------------------------------------------------------------------
+
+
+def register(event: str) -> Callable[[T], T]:
     """
     Decorator to register a Transformer class for a specific HL7 event.
 
@@ -39,7 +52,7 @@ def register(event: str):
         A class decorator that registers the transformer.
     """
 
-    def _wrap(cls: Type[Transformer]) -> Type[Transformer]:
+    def _wrap(cls: T) -> T:
         if event in _REGISTRY:
             raise ValueError(f"Transformer already registered for event {event!r}")
         if not isinstance(cls, type):

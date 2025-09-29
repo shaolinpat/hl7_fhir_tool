@@ -15,9 +15,6 @@ import importlib
 import types as pytypes
 from dataclasses import dataclass
 
-import pytest
-from hl7apy.core import Message
-
 from hl7_fhir_tool.transform.v2_to_fhir.adt_a01 import (
     ADTA01Transformer,
     _safe_str,

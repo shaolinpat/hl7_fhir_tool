@@ -42,7 +42,7 @@ import sys
 from collections.abc import Mapping, Iterable as _Iterable
 from decimal import Decimal as _Decimal
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 from uuid import UUID as _UUID
 
 from .config import load_config
@@ -300,7 +300,7 @@ def _read_text_input(path: Path) -> str:
 # ------------------------------------------------------------------------------
 
 
-def _resource_to_json_str(resource, pretty: bool) -> str:
+def _resource_to_json_str(resource: Any, pretty: bool) -> str:
     """
     Convert a FHIR resource object to a JSON string.
 
@@ -335,7 +335,8 @@ def _resource_to_json_str(resource, pretty: bool) -> str:
     try:
         mdj = getattr(resource, "model_dump_json", None)
         if callable(mdj):
-            return mdj(indent=indent)
+            # Ensure str return type without mypy casts
+            return str(mdj(indent=indent))
     except Exception:
         pass
     try:
@@ -354,7 +355,7 @@ def _resource_to_json_str(resource, pretty: bool) -> str:
         pass
 
     # ---- Generic fallback ----------------------------------------------------
-    def _to_jsonable(obj):
+    def _to_jsonable(obj: Any) -> Any:
         # primitives
         if obj is None or isinstance(obj, (str, int, float, bool)):
             return obj
@@ -397,7 +398,9 @@ def _resource_to_json_str(resource, pretty: bool) -> str:
         raise HL7FHIRToolError(f"Resource is not JSON serializable: {e}") from e
 
 
-def _write_resources_to_dir(resources: Iterable, out_dir: Path, pretty: bool) -> None:
+def _write_resources_to_dir(
+    resources: Iterable[Any], out_dir: Path, pretty: bool
+) -> None:
     """
     Write resources to JSON files in the given directory.
 
@@ -435,7 +438,7 @@ def _write_resources_to_dir(resources: Iterable, out_dir: Path, pretty: bool) ->
         LOG.info("Wrote %s", out_path)
 
 
-def _write_resources_to_stdout(resources: Iterable, pretty: bool) -> None:
+def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
     """
     Write resources to stdout.
 

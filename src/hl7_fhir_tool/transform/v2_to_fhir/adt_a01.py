@@ -15,7 +15,7 @@ Notes
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple, cast
 
 from hl7apy.core import Message
 from fhir.resources.patient import Patient
@@ -27,19 +27,37 @@ from ..base import Transformer
 
 # Ensure resource_type visible on instances under Pydantic v2
 try:
-    Patient.resource_type = "Patient"
+    setattr(Patient, "resource_type", "Patient")
 except Exception:
     pass
 try:
-    Encounter.resource_type = "Encounter"
+    setattr(Encounter, "resource_typ", "Encounter")
 except Exception:
     pass
 
+
+# try:
+#     Patient.resource_type = "Patient"
+# except Exception:
+#     pass
+# try:
+#     Encounter.resource_type = "Encounter"
+# except Exception:
+#     pass
+
+# ------------------------------------------------------------------------------
+# globals
+# ------------------------------------------------------------------------------
 
 EVENT_CODE = "ADT^A01"
 
 
-def _get_trigger(msh_9) -> Optional[str]:
+# ------------------------------------------------------------------------------
+# helpers
+# ------------------------------------------------------------------------------
+
+
+def _get_trigger(msh_9: Any) -> Optional[str]:
     """
     Return the trigger (e.g., 'ADT^A01') from MSH-9.
     Separated to allow clean testing of failure cases.
@@ -52,7 +70,7 @@ def _get_trigger(msh_9) -> Optional[str]:
         return None
 
 
-def _seq_len_safe(seq) -> int:
+def _seq_len_safe(seq: Any) -> int:
     """
     Return len(seq) but isolate so tests can inject objects whose __len__ explodes.
     """
@@ -97,7 +115,7 @@ class ADTA01Transformer(Transformer):
     # --------------------------------------------------------------------------
 
     @staticmethod
-    def _build_patient(pid) -> Patient:
+    def _build_patient(pid: Any) -> Patient:
         """
         Create a lenient Patient from PID.
         """
@@ -119,17 +137,17 @@ class ADTA01Transformer(Transformer):
         # Name: PID-5[0] family/given (simple)
         family, given = _pid_name(pid)
         if family or given:
-            entry = {}
+            entry: dict[str, Any] = {}
             if family:
                 entry["family"] = family
             if given:
-                entry["given"] = given
+                entry["given"] = given  # list[str]
             p.name = [entry]
 
         # Birth date: PID-7 -> FHIR date when possible
         birth = _pid_birthdate(pid)
         if birth:
-            p.birthDate = birth
+            p.birthDate = cast(Any, birth)  # allow FHIR 'date' string
 
         # Gender: PID-8 -> FHIR enum
         gender = _pid_gender(pid)
@@ -139,7 +157,7 @@ class ADTA01Transformer(Transformer):
         return p
 
     @staticmethod
-    def _build_encounter(pv1) -> Encounter:
+    def _build_encounter(pv1: Any) -> Encounter:
         """
         Create a lenient Encounter from PV1.
         """
@@ -167,7 +185,7 @@ class ADTA01Transformer(Transformer):
 # ------------------------------------------------------------------------------
 
 
-def _pid_identifier(pid) -> Optional[str]:
+def _pid_identifier(pid: Any) -> Optional[str]:
     """
     PID-3[0].1 (ID number) -> "value"
     """
@@ -182,13 +200,13 @@ def _pid_identifier(pid) -> Optional[str]:
     return None
 
 
-def _pid_name(pid) -> tuple[Optional[str], list[str]]:
+def _pid_name(pid: Any) -> Tuple[Optional[str], List[str]]:
     """
     PID-5[0] family/given -> (family, [given...])
     Only uses the first repetition; extend if needed.
     """
-    family = None
-    given_list: list[str] = []
+    family: Optional[str] = None
+    given_list: List[str] = []
     try:
         pid5 = getattr(pid, "pid_5", None)
         if pid5 and _seq_len_safe(pid5) > 0:
@@ -204,7 +222,7 @@ def _pid_name(pid) -> tuple[Optional[str], list[str]]:
     return family, given_list
 
 
-def _pid_birthdate(pid) -> Optional[str]:
+def _pid_birthdate(pid: Any) -> Optional[str]:
     """
     PID-7 (TS/DTM) -> FHIR date string.
     Accept:
@@ -230,7 +248,7 @@ def _pid_birthdate(pid) -> Optional[str]:
     return None
 
 
-def _pid_gender(pid) -> Optional[str]:
+def _pid_gender(pid: Any) -> Optional[str]:
     """
     PID-8 v2 to FHIR gender:
         M -> male, F -> female, O -> other, U -> unknown
@@ -258,7 +276,7 @@ def _pid_gender(pid) -> Optional[str]:
 # ------------------------------------------------------------------------------
 
 
-def _safe_str(value) -> str:
+def _safe_str(value: Any) -> str:
     """
     Best-effort stringification for hl7apy components/fields.
     Uses to_er7() if available; else str(value).
