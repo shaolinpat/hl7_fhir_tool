@@ -86,12 +86,13 @@ Badges are displayed at the top of this file.
 
 ## Status
 
-This is a **skeleton / prototype**, not a production system.  
-The focus is on demonstrating:
+This repository is a prototype intended to demonstrate:
 
-- Healthcare data standards familiarity (HL7 v2, FHIR)
-- Robust test coverage
-- Professional software engineering practices (CI/CD, packaging, typing)
+- Familiarity with healthcare data standards (HL7 v2, FHIR)  
+- Strong test coverage practices  
+- Professional software engineering (CI/CD, packaging, typing)  
+
+It is not intended for clinical or production use.
 
 ---
 
