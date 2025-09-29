@@ -86,13 +86,15 @@ Badges are displayed at the top of this file.
 
 ## Status
 
-This repository is a prototype intended to demonstrate:
+This project is a prototype and educational tool. Its purpose is to:
 
-- Familiarity with healthcare data standards (HL7 v2, FHIR)  
-- Strong test coverage practices  
-- Professional software engineering (CI/CD, packaging, typing)  
+ - Demonstrate familiarity with healthcare data standards (HL7 v2, FHIR)
 
-It is not intended for clinical or production use.
+ - Showcase strong test coverage and continuous integration practices
+
+ - Illustrate professional software engineering techniques (packaging, typing, CLI design)
+
+Not designed or validated for clinical or production deployment.
 
 ---
 
