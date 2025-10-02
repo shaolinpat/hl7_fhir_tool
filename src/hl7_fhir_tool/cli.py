@@ -52,9 +52,7 @@ from .hl7_parser import parse_hl7_v2, to_pretty_segments
 from .logging_utils import configure_logging
 from .transform.registry import available_events, get_transformer
 
-# Force-load concrete transformers so @register(...) runs (side-effect import).
-# Keep this import even if it appears unused.
-from .transform.v2_to_fhir import adt_a01  # noqa: F401
+# import hl7_fhir_tool.transform
 
 # ------------------------------------------------------------------------------
 # globals
@@ -241,7 +239,7 @@ def _validate_output_mode(output_dir: Optional[Path], to_stdout: bool) -> None:
     output_dir : Path or None
         Directory the user requested, or None to use config default.
     to_stdout : bool
-        True to write output to stdout instead of files.
+        True to write resources to stdout instead of files.
 
     Returns
     -------
@@ -450,7 +448,7 @@ def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
     resources : Iterable
         Iterable of FHIR resource instances.
     pretty : bool
-        If True, pretty-print output.
+        If True, pretty-print JSON output.
 
     Returns
     -------
@@ -558,7 +556,6 @@ def _cmd_transform(
         If True, list available HL7 v2 event codes and exit.
     output_dir : Path or None
         Directory to write JSON resources when not writing to stdout.
-        If None, the config default_output_dir is used.
     to_stdout : bool
         If True, write resources to stdout; otherwise to files.
     pretty : bool

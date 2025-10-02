@@ -36,15 +36,6 @@ except Exception:
     pass
 
 
-# try:
-#     Patient.resource_type = "Patient"
-# except Exception:
-#     pass
-# try:
-#     Encounter.resource_type = "Encounter"
-# except Exception:
-#     pass
-
 # ------------------------------------------------------------------------------
 # globals
 # ------------------------------------------------------------------------------

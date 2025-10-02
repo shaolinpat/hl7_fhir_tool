@@ -5,9 +5,97 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-
 A prototype Python package for parsing, validating, and transforming **HL7 v2** messages into **FHIR** resources.  
 This project demonstrates healthcare data parsing, normalization, and CLI design with full test coverage.
+
+---
+
+## Table of Contents
+
+- [Why This Project Matters](#why-this-project-matters)
+  - [Why SPARQL and SHACL Belong Here](#why-sparql-and-shacl-belong-here)
+  - [Where Java Fits](#where-java-fits)
+- [Why LOINC Matters Here](#why-loinc-matters-here)
+- [Why ICD-10 Matters Here](#why-icd-10-matters-here)
+- [HL7 to FHIR Flow Diagram](#hl7-to-fhir-flow-diagram)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Parse HL7 v2 messages](#parse-hl7-v2-messages)
+  - [Parse FHIR JSON or XML](#parse-fhir-json-or-xml)
+  - [Transform HL7 v2 → FHIR](#transform-hl7-v2--fhir)
+    - [ADT^A01 (Admit)](#adta01-admit)
+    - [ADT^A03 (Discharge)](#adta03-discharge)
+    - [List supported events](#list-supported-events)
+- [Development](#development)
+- [Continuous Integration](#continuous-integration)
+- [Status](#status)
+- [License](#license)
+
+---
+
+## Why This Project Matters
+
+Healthcare systems still run on HL7 v2 (ADT/ORU/ORM messages) while modern interoperability and analytics increasingly depend on FHIR APIs and knowledge graphs. This repo bridges that gap:
+
+- **HL7 v2 → FHIR**: Transforms core events (ADT^A01 admit, ADT^A03 discharge, ADT^A08 patient update, ORU lab results, ORM orders) into clean FHIR resources (Patient, Encounter, Observation, ServiceRequest, DiagnosticReport).  
+- **Standards Alignment**: Positions legacy hospital feeds for use in FHIR-native apps, analytics platforms, and regulatory use cases (patient access, care coordination, research).  
+- **Data Reuse**: Converts brittle, site-specific HL7 v2 streams into structured, web-friendly FHIR models that downstream systems can trust.  
+
+### Why SPARQL and SHACL Belong Here
+
+- **Knowledge Graph Analytics**: FHIR JSON is great for APIs, but cohort building, quality rules, and cross-encounter reasoning shine in RDF. Serializing FHIR to RDF enables:  
+  - SPARQL queries for cohorts, outcomes, and KPI dashboards.  
+  - SHACL constraints for data quality and conformance checks (e.g., every Encounter must have a Patient; Observations must have LOINC codes where expected).  
+
+### Where Java Fits
+
+- **Enterprise Connectors**: Many hospitals and integration engines run on the JVM. A Java module can:  
+  - Consume the same FHIR outputs (via HAPI FHIR) for server-side validation, persistence, and RESTful exposure.  
+  - Offer HL7 v2 interfaces where JVM-based tools (Mirth/NextGen Connect, Camel, Spring Integration) are standard.  
+  - Run SHACL validation (via Java RDF libraries) and publish results to operational dashboards.  
+- **Production Hardening**: JVM services can wrap the Python transforms for scale (queue workers, retries, circuit breakers) and integrate with existing enterprise logging and SSO.  
+
+---
+
+## Why LOINC Matters Here
+
+Lab results and clinical observations are only as useful as the codes behind them. Different hospitals and labs label the same test in inconsistent ways ("Glucose, fasting plasma" vs. "FPG" vs. "GLU-F"). The Logical Observation Identifiers Names and Codes (LOINC) standard provides a universal vocabulary for lab tests, vital signs, and other measurements. 
+
+- **HL7 v2**: ORU messages carry test identifiers in OBX segments, which can (and should) reference LOINC codes.  
+- **FHIR**: Observations and DiagnosticReports are expected to use LOINC as their coding system, ensuring that "glucose test" means the same thing everywhere.  
+- **RDF/SPARQL**: Once FHIR Observations are serialized into RDF, LOINC codes allow cross-institution queries like:  
+  - "Find all patients with HbA1c (LOINC 4548-4) above 8.0."  
+  - "Count distinct LOINC-coded blood pressure observations in the last 6 months."  
+- **Java Integration**: Enterprise-grade tools can validate LOINC coding in Observations, enforce SHACL rules (e.g., "Every Observation must carry a valid LOINC code if it is a lab test"), and publish results to downstream systems.  
+
+By including LOINC in the HL7 → FHIR transformation, this project not only normalizes messy legacy data but also anchors it in the globally recognized clinical coding ecosystem, enabling meaningful analytics, interoperability, and quality checks across systems.
+
+---
+
+## Why ICD-10 Matters Here
+
+If LOINC tells us *what was measured*, ICD-10 tells us *what condition the patient has*. ICD-10 (International Classification of Diseases, 10th Revision) is the global standard for diagnoses, used in clinical care, research, and billing. Together with LOINC, it anchors HL7 → FHIR transformations in a standardized coding ecosystem.
+
+- **HL7 v2**: Diagnoses typically appear in DG1 segments, where ICD-10 codes represent admitting, discharge, or encounter-associated conditions (e.g., E11.9 = Type 2 diabetes mellitus without complications).  
+- **FHIR**: Diagnoses are captured as `Condition` resources with ICD-10 codes, linked to patients and encounters, and can be cross-referenced with Observations.  
+- **RDF/SPARQL**: ICD-10 enables semantic queries such as:  
+  - "Find all patients discharged with ICD-10 I21 (acute myocardial infarction)."  
+  - "Count patients with ICD-10 E11.9 who also have an HbA1c (LOINC 4548-4) test over 8.0."  
+- **Java Integration**: Enterprise-grade tools can validate ICD-10 coding in Conditions, enforce SHACL rules (e.g., "Every Encounter must reference at least one ICD-10-coded Condition"), and feed ICD-10-coded data into quality reporting or claims workflows.  
+
+By including ICD-10 in the HL7 → FHIR transformation, this project does more than parse messages — it aligns patient encounters and diagnoses with internationally recognized codes. That ensures the data can be used reliably for analytics, interoperability, regulatory reporting, and reimbursement.
+
+---
+
+## HL7 to FHIR Flow Diagram
+
+The diagram below summarizes how HL7 v2 messages (ADT, ORM, ORU) map to FHIR resources, and where ICD-10 and LOINC fit in.  
+It also shows optional RDF/SPARQL/SHACL and Java integration layers.
+
+![HL7 to FHIR Detailed Flow – Dark](images/hl7_fhir_detailed_flow_dark.png#gh-dark-mode-only)
+![HL7 to FHIR Detailed Flow – Light](images/hl7_fhir_detailed_flow.png#gh-light-mode-only)
+
 
 ---
 
@@ -18,6 +106,8 @@ This project demonstrates healthcare data parsing, normalization, and CLI design
 - Transform HL7 v2 → FHIR resource structures
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
+
+> **Note:** This tool is intentionally **one-way (HL7 v2 → FHIR only)**. Reverse transformation (FHIR → HL7) is not supported.
 
 ---
 
@@ -42,17 +132,100 @@ The CLI is installed as a Python entry point. Run with:
 python -m src.hl7_fhir_tool.cli --help
 ```
 
-Examples:
-
+### Parse HL7 v2 messages
 ```bash
-# Parse HL7 v2 messages
 python -m src.hl7_fhir_tool.cli parse-hl7 tests/data/adt_a01_251.hl7
+```
+_Output (segments pretty-printed):_
+```
+MSH|^~\&|...
+PID|1||12345||Doe^John||19700101|M
+PV1|1|I|...
+```
 
-# Parse FHIR JSON/XML
+### Parse FHIR JSON or XML
+```bash
 python -m src.hl7_fhir_tool.cli parse-fhir tests/data/patient.json
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "identifier": [{"value": "12345"}],
+  "name": [{"family": "Doe", "given": ["John"]}],
+  "gender": "male",
+  "birthDate": "1970-01-01"
+}
+```
 
-# Transform HL7 v2 → FHIR
+### Transform HL7 v2 → FHIR
+
+#### ADT^A01 (Admit)
+```bash
 python -m src.hl7_fhir_tool.cli transform tests/data/adt_a01_251.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "identifier": [{"value": "12345"}],
+  "name": [{"family": "Doe", "given": ["John"]}],
+  "gender": "male",
+  "birthDate": "1970-01-01"
+}
+
+{
+  "resourceType": "Encounter",
+  "status": "in-progress"
+}
+```
+
+#### ADT^A03 (Discharge)
+
+_Minimal example:_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/adt_a03_min.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "id": "12345",
+  "name": [{"family": "Doe", "given": ["Jane"]}]
+}
+
+{
+  "resourceType": "Encounter",
+  "id": "enc-12345",
+  "status": "finished",
+  "class": {"coding": [{"code": "I"}]}
+}
+```
+
+_With encounter period:_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/adt_a03_with_period.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Encounter",
+  "id": "V123",
+  "status": "finished",
+  "class": {"coding": [{"code": "I"}]},
+  "period": {"start": "2025-01-01", "end": "2025-01-02"}
+}
+```
+
+### List supported events
+```bash
+python -m src.hl7_fhir_tool.cli transform - --list
+```
+_Output:_
+```
+Registered HL7 v2 → FHIR events:
+  ADT^A01
+  ADT^A03
 ```
 
 ---
@@ -81,20 +254,18 @@ mypy
 
 Badges are displayed at the top of this file.
 
-
 ---
 
 ## Status
 
-This project is a prototype and educational tool. Its purpose is to:
+This project is an evolving prototype interoperability toolkit, positioned at the intersection of healthcare standards and modern data engineering. It is not a production system, but it demonstrates:
 
- - Demonstrate familiarity with healthcare data standards (HL7 v2, FHIR)
+- Healthcare standards mastery: HL7 v2 messaging, FHIR resource modeling, LOINC for labs, ICD-10 for diagnoses.
+- Data transformation and normalization: Converting brittle HL7 v2 feeds into structured, FHIR-compliant resources.
+- Knowledge graph readiness: RDF serialization, SPARQL queries, and SHACL validation for advanced analytics and conformance checking.
+- Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design, and integration pathways for Java ecosystems.
 
- - Showcase strong test coverage and continuous integration practices
-
- - Illustrate professional software engineering techniques (packaging, typing, CLI design)
-
-Not designed or validated for clinical or production deployment.
+This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.
 
 ---
 
