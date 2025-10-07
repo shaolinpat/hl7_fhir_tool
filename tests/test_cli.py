@@ -348,6 +348,141 @@ def test_write_resources_to_stdout_ndjson_and_except(capsys):
 
 
 # ------------------------------------------------------------------------------
+# _parse_hl7_for_cli
+# ------------------------------------------------------------------------------
+
+
+def test_parse_hl7_for_cli_primary_success_no_fallback(monkeypatch):
+    sentinel = object()
+
+    class _Bomb(Exception):
+        pass
+
+    def ok_parser(txt):
+        return sentinel
+
+    def bomb_parse_message(*_args, **_kwargs):
+        raise _Bomb("fallback should not be called when primary succeeds")
+
+    monkeypatch.setattr(cli, "parse_hl7_v2", ok_parser, raising=True)
+    monkeypatch.setattr(cli, "parse_message", bomb_parse_message, raising=True)
+
+    msg_txt = "MSH|^~\\&|A|B|C|D|202501011200||ORM^O01^ORM_O01|X|P|2.5\rPID|1||123||Doe^John\r"
+    out = cli._parse_hl7_for_cli(msg_txt)
+
+    assert out is sentinel
+
+
+def test_parse_hl7_for_cli_orm_fallback_invokes_find_groups_and_cr(monkeypatch):
+    calls = {}
+
+    def bad_parser(_txt):
+        raise RuntimeError("boom primary")
+
+    def ok_parse_message(content, *, validation_level=None, find_groups=None, **_k):
+        calls["content"] = content
+        calls["validation_level"] = validation_level
+        calls["find_groups"] = find_groups
+        return object()
+
+    monkeypatch.setattr(cli, "parse_hl7_v2", bad_parser, raising=True)
+    monkeypatch.setattr(cli, "parse_message", ok_parse_message, raising=True)
+    monkeypatch.setattr(
+        cli, "VALIDATION_LEVEL", types.SimpleNamespace(STRICT=1), raising=True
+    )
+
+    msg_txt = (
+        "MSH|^~\\&|LAB|HOSP|EHR|HOSP|202501011200||ORM^O01^ORM_O01|MSG0001|P|2.5\n"
+        "PID|1||12345||Doe^John^A\n"
+        "ORC|NW|ORD123|||NW\n"
+        "OBR|1|ORD123||GLU^Glucose^LN\n"
+    )
+    out = cli._parse_hl7_for_cli(msg_txt)
+
+    assert out is not None
+    assert "\r" in calls.get("content", ""), "Expected CRs in normalized content"
+    assert "\n" not in calls.get("content", ""), "LFs should be normalized to CRs"
+    assert calls.get("find_groups") is True
+
+
+def test_parse_hl7_for_cli_non_orm_failure_propagates(monkeypatch):
+
+    class MyErr(Exception):
+        pass
+
+    def bad_parser(_txt):
+        raise MyErr("no fallback for non-ORM")
+
+    monkeypatch.setattr(cli, "parse_hl7_v2", bad_parser, raising=True)
+
+    msg_txt = "MSH|^~\\&|LAB|HOSP|EHR|HOSP|202501011200||ADT^A01|MSG0001|P|2.5\rPID|1||12345||Doe^John^A\r"
+    with pytest.raises(MyErr) as e:
+        cli._parse_hl7_for_cli(msg_txt)
+
+    assert "no fallback" in str(e.value)
+    assert isinstance(e.value, MyErr)
+
+
+@pytest.mark.parametrize(
+    "label, make_msg",
+    [
+        (
+            "lf_only",
+            lambda: (
+                "MSH|^~\\&|LAB|HOSP|EHR|HOSP|202501011200||ORM^O01^ORM_O01|MSG0001|P|2.5\n"
+                "PID|1||12345||Doe^John^A\n"
+                "ORC|NW|ORD123|||NW\n"
+                "OBR|1|ORD123||GLU^Glucose^LN\n"
+            ),
+        ),
+        (
+            "cr_only",
+            lambda: (
+                "MSH|^~\\&|LAB|HOSP|EHR|HOSP|202501011200||ORM^O01^ORM_O01|MSG0001|P|2.5\r"
+                "PID|1||12345||Doe^John^A\r"
+                "ORC|NW|ORD123|||NW\r"
+                "OBR|1|ORD123||GLU^Glucose^LN\r"
+            ),
+        ),
+    ],
+)
+def test_parse_hl7_for_cli_covers_label_make_msg(monkeypatch, label, make_msg):
+    calls = {}
+
+    def bad_primary(_txt):
+        raise RuntimeError("primary failed")
+
+    def spy_parse_message(content, *, validation_level=None, find_groups=None, **_k):
+        calls["content"] = content
+        calls["validation_level"] = validation_level
+        calls["find_groups"] = find_groups
+        return object()
+
+    monkeypatch.setattr(cli, "parse_hl7_v2", bad_primary, raising=True)
+    monkeypatch.setattr(cli, "parse_message", spy_parse_message, raising=True)
+    monkeypatch.setattr(
+        cli, "VALIDATION_LEVEL", types.SimpleNamespace(STRICT=123), raising=True
+    )
+
+    msg_txt = make_msg()
+    out = cli._parse_hl7_for_cli(msg_txt)
+
+    assert out is not None
+
+    norm = calls["content"]
+    if label == "lf_only":
+        assert "\r" in norm and "\n" not in norm, "Expected LF->CR normalization"
+        assert norm != msg_txt, "Normalized content should differ from LF-only input"
+    else:  # 'cr_only'
+        assert (
+            norm == msg_txt
+        ), "Content should be unchanged when CRs are already present"
+
+    assert calls["find_groups"] is True
+    assert calls["validation_level"] == 123
+
+
+# ------------------------------------------------------------------------------
 # _cmd_transform
 # ------------------------------------------------------------------------------
 

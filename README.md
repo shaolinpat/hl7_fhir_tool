@@ -103,7 +103,7 @@ It also shows optional RDF/SPARQL/SHACL and Java integration layers.
 
 - Parse HL7 v2 messages (using [`hl7apy`](https://crs4.github.io/hl7apy/))
 - Parse FHIR JSON or XML (using [`pydantic-fhir`](https://github.com/nazrulworld/fhir.resources))
-- Transform HL7 v2 → FHIR resource structures
+- Transform HL7 v2 → FHIR resource structures (ADT^A01/A03/A08, ORM^O01)
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
 
@@ -138,9 +138,10 @@ python -m src.hl7_fhir_tool.cli parse-hl7 tests/data/adt_a01_251.hl7
 ```
 _Output (segments pretty-printed):_
 ```
-MSH|^~\&|...
-PID|1||12345||Doe^John||19700101|M
-PV1|1|I|...
+MSH|^~\&|HIS|RIH|EKG|EKG|20250101123000||ADT^A01|MSG00001|P|2.5.1
+EVN|A01|20250101123000
+PID|1||12345^^^MRN||Doe^John^^^^^L||19700101|M|||123 Main St^^Cincinnati^OH^45220||5551234567
+PV1|1|I|2000^2012^01||||1234^Physician^Primary
 ```
 
 ### Parse FHIR JSON or XML
@@ -151,8 +152,15 @@ _Output:_
 ```json
 {
   "resourceType": "Patient",
-  "identifier": [{"value": "12345"}],
-  "name": [{"family": "Doe", "given": ["John"]}],
+  "id": "p1",
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "John"
+      ]
+    }
+  ],
   "gender": "male",
   "birthDate": "1970-01-01"
 }
@@ -168,8 +176,19 @@ _Output:_
 ```json
 {
   "resourceType": "Patient",
-  "identifier": [{"value": "12345"}],
-  "name": [{"family": "Doe", "given": ["John"]}],
+  "identifier": [
+    {
+      "value": "12345"
+    }
+  ],
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "John"
+      ]
+    }
+  ],
   "gender": "male",
   "birthDate": "1970-01-01"
 }
@@ -191,14 +210,27 @@ _Output:_
 {
   "resourceType": "Patient",
   "id": "12345",
-  "name": [{"family": "Doe", "given": ["Jane"]}]
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "Jane"
+      ]
+    }
+  ]
 }
 
 {
   "resourceType": "Encounter",
   "id": "enc-12345",
   "status": "finished",
-  "class": {"coding": [{"code": "I"}]}
+  "class": {
+    "coding": [
+      {
+        "code": "I"
+      }
+    ]
+  }
 }
 ```
 
@@ -209,13 +241,125 @@ python -m src.hl7_fhir_tool.cli transform tests/data/adt_a03_with_period.hl7 --s
 _Output:_
 ```json
 {
+  "resourceType": "Patient",
+  "id": "77777",
+  "name": [
+    {
+      "family": "Alpha",
+      "given": [
+        "Test"
+      ]
+    }
+  ]
+}
+
+{
   "resourceType": "Encounter",
-  "id": "V123",
+  "id": "enc-77777",
   "status": "finished",
-  "class": {"coding": [{"code": "I"}]},
-  "period": {"start": "2025-01-01", "end": "2025-01-02"}
+  "class": {
+    "coding": [
+      {
+        "code": "I"
+      }
+    ]
+  }
 }
 ```
+
+#### ORM^O01 (Order)
+
+_Minimal example:_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/orm_o01_min.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "id": "12345",
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "John"
+      ]
+    }
+  ],
+  "gender": "male",
+  "birthDate": "1970-01-01"
+}
+
+{
+  "resourceType": "ServiceRequest",
+  "id": "ORD123",
+  "identifier": [
+    {
+      "value": "ORD123"
+    }
+  ],
+  "status": "active",
+  "intent": "order",
+  "subject": {
+    "reference": "Patient/12345"
+  }
+}
+
+```
+
+_With OBR-driven code (e.g., OBR-4):_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/orm_o01_glu.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "id": "12345",
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "John"
+      ]
+    }
+  ],
+  "gender": "male",
+  "birthDate": "1970-01-01"
+}
+
+{
+  "resourceType": "ServiceRequest",
+  "id": "ORD123",
+  "identifier": [
+    {
+      "value": "ORD123"
+    }
+  ],
+  "status": "active",
+  "intent": "order",
+  "code": {
+    "concept": {
+      "coding": [
+        {
+          "code": "GLU"
+        }
+      ],
+      "text": "Glucose"
+    }
+  },
+  "subject": {
+    "reference": "Patient/12345"
+  }
+}
+
+```
+
+_Mapping notes:_
+- **ORC-2/ORC-3** → `ServiceRequest.identifier` (placer/filler numbers)
+- **ORC-5** (order status) → `ServiceRequest.status` (e.g., `NW` ⇒ `active`, `CA` ⇒ `revoked`, `CM` ⇒ `completed`)
+- **OBR-4** (Universal Service ID) → `ServiceRequest.code` (prefer LOINC when available)
+- **PID** → `Patient` (linked via `ServiceRequest.subject`)
 
 ### List supported events
 ```bash
@@ -224,8 +368,10 @@ python -m src.hl7_fhir_tool.cli transform - --list
 _Output:_
 ```
 Registered HL7 v2 → FHIR events:
-  ADT^A01
-  ADT^A03
+    ADT^A01
+    ADT^A03
+    ADT^A08
+    ORM^O01
 ```
 
 ---

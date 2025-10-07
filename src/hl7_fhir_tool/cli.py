@@ -41,6 +41,9 @@ import sys
 
 from collections.abc import Mapping, Iterable as _Iterable
 from decimal import Decimal as _Decimal
+from hl7apy.core import Message
+from hl7apy.parser import parse_message
+from hl7apy.validation import VALIDATION_LEVEL
 from pathlib import Path
 from typing import Any, Iterable, Optional
 from uuid import UUID as _UUID
@@ -478,6 +481,37 @@ def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
 
 
 # ------------------------------------------------------------------------------
+# HL7 parse helper
+# ------------------------------------------------------------------------------
+
+
+def _parse_hl7_for_cli(content: str) -> Message:
+    """
+    Parse HL7 v2 text with project default, and fall back to hl7apy group
+    inference for messages that otherwise fail with "PID is not a valid child
+    for <Message ...>".
+
+    This currently ony happens with ORM^O01 messages but there may be others.
+    """
+    try:
+        return parse_hl7_v2(content)
+    except Exception:
+        if "ORM^O01" not in content:
+            raise
+
+        # Try hl7apy with find_groups=True
+        if "\r" not in content and "\n" in content:
+            content = content.replace("\n", "\r")
+
+        msg = parse_message(
+            content,
+            validation_level=VALIDATION_LEVEL.STRICT,
+            find_groups=True,
+        )
+        return msg
+
+
+# ------------------------------------------------------------------------------
 # Command handlers
 # ------------------------------------------------------------------------------
 
@@ -503,7 +537,7 @@ def _cmd_parse_hl7(path: Path) -> int:
     """
     _validate_existing_file(path, allow_stdin=True)
     content = _read_text_input(path)
-    msg = parse_hl7_v2(content)
+    msg = _parse_hl7_for_cli(content)
     for line in to_pretty_segments(msg):
         print(line)
     return EXIT_OK
@@ -572,15 +606,16 @@ def _cmd_transform(
         For invalid input, missing transformer, or unwritable output.
     """
     if list_only:
+        print("Registered HL7 v2 → FHIR events:")
         for evt in sorted(available_events()):
-            print(evt)
+            print(f"    {evt}")
         return EXIT_OK
 
     _validate_existing_file(path, allow_stdin=True)
     _validate_output_mode(output_dir, to_stdout)
 
     content = _read_text_input(path)
-    msg = parse_hl7_v2(content)
+    msg = _parse_hl7_for_cli(content)
 
     xform = get_transformer(msg)
     if not xform:
