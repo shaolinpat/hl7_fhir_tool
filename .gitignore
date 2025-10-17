@@ -24,12 +24,16 @@ ENV/
 .coverage
 .coverage.*
 coverage.xml
+coverage.json
 htmlcov/
 .tox/
 .nox/
 
 # test data
 tests/data
+
+# tools/
+tools/
 
 # Type checker / linter caches
 .mypy_cache/

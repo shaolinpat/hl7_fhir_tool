@@ -9,17 +9,19 @@ omit =
     */__pycache__/*
     */.venv/*
     */.conda/*
+# dynamic_context = test_function
 
 [report]
 show_missing = True
 precision = 2
 exclude_lines =
-    pragma: no cover
+    # pragma: no cover
     if __name__ == .__main__.:
     if typing\.TYPE_CHECKING:
     @overload
     @abc\.abstractmethod
-
+    ^\s*\.\.\.$
+    
 [paths]
 source =
     src/hl7_fhir_tool
@@ -28,3 +30,6 @@ source =
 [html]
 directory = htmlcov
 title = hl7_fhir_tool coverage
+# 
+[json]
+show_contexts = True

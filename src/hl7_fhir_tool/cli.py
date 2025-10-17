@@ -496,7 +496,8 @@ def _parse_hl7_for_cli(content: str) -> Message:
     try:
         return parse_hl7_v2(content)
     except Exception:
-        if "ORM^O01" not in content:
+        # if "ORM^O01" not in content:
+        if not any(k in content for k in ("ORM^O01", "ORU^R01")):
             raise
 
         # Try hl7apy with find_groups=True
