@@ -103,7 +103,7 @@ It also shows optional RDF/SPARQL/SHACL and Java integration layers.
 
 - Parse HL7 v2 messages (using [`hl7apy`](https://crs4.github.io/hl7apy/))
 - Parse FHIR JSON or XML (using [`pydantic-fhir`](https://github.com/nazrulworld/fhir.resources))
-- Transform HL7 v2 → FHIR resource structures (ADT^A01/A03/A08, ORM^O01)
+- Transform HL7 v2 → FHIR resource structures (ADT^A01/A03/A08, ORM^O01, ORU^R01)
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
 
@@ -361,6 +361,68 @@ _Mapping notes:_
 - **OBR-4** (Universal Service ID) → `ServiceRequest.code` (prefer LOINC when available)
 - **PID** → `Patient` (linked via `ServiceRequest.subject`)
 
+#### ORU^R01 (Observation Result)
+
+_Minimal example:_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/oru_r01_min.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "id": "P12345",
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "Jane"
+      ]
+    }
+  ],
+  "gender": "female",
+  "birthDate": "1983-05-14"
+}
+
+{
+  "resourceType": "Observation",
+  "id": "obs-P12345-1",
+  "identifier": [
+    {
+      "value": "1234"
+    },
+    {
+      "value": "5678"
+    }
+  ],
+  "status": "final",
+  "code": {
+    "coding": [
+      {
+        "code": "GLU"
+      }
+    ],
+    "text": "Glucose"
+  },
+  "subject": {
+    "reference": "Patient/P12345"
+  },
+  "valueQuantity": {
+    "value": 110.0,
+    "unit": "mg/dL"
+  }
+}
+```
+
+_Mapping notes:_
+- **OBR-2/OBR-3** → `Observation.identifier` (placer/filler numbers)
+- **OBR-7** → `Observation.effectiveDateTime` (date/time of observation)
+- **OBX-2/OBX-5/OBX-6** → `Observation.valueQuantity` or `Observation.valueString`
+- **OBX-3** → `Observation.code` (use LOINC if available)
+- **PID** → `Patient` (linked via `Observation.subject`)
+
+
+
 ### List supported events
 ```bash
 python -m src.hl7_fhir_tool.cli transform - --list
@@ -372,6 +434,7 @@ Registered HL7 v2 → FHIR events:
     ADT^A03
     ADT^A08
     ORM^O01
+    ORU^R01
 ```
 
 ---
