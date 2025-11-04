@@ -1,0 +1,12 @@
+# /tests/data/fhir_bad_closed.ttl
+
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix fhir:  <http://hl7.org/fhir/> .
+@prefix ex:    <http://example.org/fhir/> .
+
+# Extra unexpected property (closed shape should flag it)
+ex:P2 a fhir:Patient ;
+    fhir:identifier "X1" ;
+    fhir:gender "other" ;
+    fhir:unknownProp "oops" .

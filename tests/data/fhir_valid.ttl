@@ -1,0 +1,29 @@
+# tests/data/fhir_valid.ttl
+
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix fhir:  <http://hl7.org/fhir/> .
+@prefix ex:    <http://example.org/fhir/> .
+
+ex:P1 a fhir:Patient ;
+    rdfs:label "John Doe" ;
+    fhir:identifier "AA1" ;
+    fhir:gender "male" ;
+    fhir:birthDate "1970-01-01"^^xsd:date .
+
+ex:E1 a fhir:Encounter ;
+    fhir:subject ex:P1 ;
+    fhir:status "finished" .
+
+ex:SR1 a fhir:ServiceRequest ;
+    fhir:subject ex:P1 ;
+    fhir:code "GLU" ;
+    fhir:status "active" ;
+    fhir:intent "order" .
+
+ex:O1 a fhir:Observation ;
+    fhir:subject ex:P1 ;
+    fhir:code "GLU" ;
+    fhir:value "95"^^xsd:decimal ;
+    fhir:effectiveDateTime "2025-01-01T12:00:00"^^xsd:dateTime .

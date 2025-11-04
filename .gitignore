@@ -30,7 +30,7 @@ htmlcov/
 .nox/
 
 # test data
-tests/data
+#tests/data
 
 # tools/
 tools/

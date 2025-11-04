@@ -1,0 +1,18 @@
+# tests/data/fhir_bad_values.ttl
+
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix fhir:  <http://hl7.org/fhir/> .
+@prefix ex:    <http://example.org/fhir/> .
+
+# Wrong enums and missing requireds
+ex:E2 a fhir:Encounter ;
+    fhir:status "bogus" .
+
+ex:SR2 a fhir:ServiceRequest ;
+    fhir:subject ex:P2 ;
+    fhir:status "bogus" ;
+    fhir:intent "whatever" .
+
+ex:O2 a fhir:Observation ;
+    fhir:subject ex:P2 ;
+    fhir:code "GLU" .  # missing value
