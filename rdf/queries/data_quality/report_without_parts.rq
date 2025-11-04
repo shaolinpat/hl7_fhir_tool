@@ -1,0 +1,6 @@
+PREFIX hft: <http://example.org/hl7-fhir/>
+
+SELECT ?diagnostic_report WHERE {
+    ?diagnostic_report a hft:DiagnosticReport .
+    FILTER NOT EXISTS { ?diagnostic_report hft:hasPart ?o } 
+}

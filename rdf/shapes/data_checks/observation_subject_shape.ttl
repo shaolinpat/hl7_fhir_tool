@@ -1,0 +1,38 @@
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix hft:    <http://example.org/hl7-fhir/> .
+@prefix loinc:  <http://loinc.org/> .
+
+hft:ObservationSubjectAndCodeShape
+  a sh:NodeShape ;
+  sh:targetClass hft:Observation ;
+  sh:closed false ;
+  # must reference a Patient
+  sh:property [
+    sh:path hft:observationSubject ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class hft:Patient ;
+    sh:message "Observation must reference a Patient via hft:observationSubject." ;
+    sh:severity sh:Violation
+  ] ;
+  # must be HbA1c by code
+  sh:property [
+    sh:path hft:hasCode ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:hasValue loinc:4548-4 ;
+    sh:message "Observation must have HbA1c code: hft:hasCode loinc:4548-4." ;
+    sh:severity sh:Violation
+  ] ;
+  # optional admin fields with types if present
+  sh:property [
+    sh:path hft:effectiveDateTime ; sh:maxCount 1 ; sh:datatype xsd:dateTime ;
+    sh:message "If present, hft:effectiveDateTime must be xsd:dateTime." ;
+    sh:severity sh:Violation
+  ] ;
+  sh:property [
+    sh:path hft:status ; sh:maxCount 1 ; sh:datatype xsd:string ;
+    sh:message "If present, hft:status must be a string." ;
+    sh:severity sh:Violation
+  ] .

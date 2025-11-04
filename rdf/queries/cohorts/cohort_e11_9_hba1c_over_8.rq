@@ -1,0 +1,24 @@
+PREFIX hft:   <http://example.org/hl7-fhir/>
+PREFIX loinc: <http://loinc.org/>
+PREFIX icd10: <http://hl7.org/fhir/sid/icd-10-cm/>
+PREFIX xsd:   <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT ?patient WHERE {
+    ?enc a hft:Encounter ;
+         hft:encounterSubject ?patient ;
+         hft:hasCondition ?cond .
+    ?cond hft:hasCode icd10:E11.9 .
+    
+    ?obs a hft:Observation ; 
+         hft:observationSubject ?patient ;
+         hft:hasCode loinc:4548-4 .
+         
+    {
+        ?obs hft:valueDecimal ?v
+        } UNION {
+            ?obs hft:valueInteger ?vi 
+            BIND(xsd:decimal(?vi) AS ?v)
+    }
+
+    FILTER(xsd:decimal(?v) > 8.0)
+}

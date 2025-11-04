@@ -1,0 +1,348 @@
+@prefix : <http://example.org/hl7-fhir-tool#> .
+@prefix hft: <http://example.org/hl7-fhir/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix fhir: <http://hl7.org/fhir/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix icd10: <http://hl7.org/fhir/sid/icd-10-cm/> .
+@prefix loinc: <http://loinc.org/> .
+@base <http://example.org/hl7-fhir-tool#> .
+
+<http://example.org/hl7-fhir-tool> rdf:type owl:Ontology ;
+                                    owl:versionInfo "Created with TopBraid Composer" .
+
+#################################################################
+#    Datatypes
+#################################################################
+
+###  http://www.w3.org/2001/XMLSchema#date
+xsd:date rdf:type rdfs:Datatype .
+
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  http://example.org/hl7-fhir/basedOn
+hft:basedOn rdf:type owl:ObjectProperty ;
+            rdfs:subPropertyOf fhir:basedOn ;
+            rdfs:domain hft:DiagnosticReport ;
+            rdfs:range hft:ServiceRequest ;
+            rdfs:comment "DiagnosticReport is based on a ServiceRequest; aligns to fhir:basedOn." ;
+            rdfs:label "based on" .
+
+
+###  http://example.org/hl7-fhir/conditionSubject
+hft:conditionSubject rdf:type owl:ObjectProperty ;
+                     rdfs:subPropertyOf hft:hasSubject ;
+                     rdf:type owl:FunctionalProperty ;
+                     rdfs:domain hft:Condition ;
+                     rdfs:range hft:Patient ;
+                     rdfs:comment "Links a Condition to the Patient it concerns; functional subPropertyOf hft:hasSubject." ;
+                     rdfs:label "condition subject" .
+
+
+###  http://example.org/hl7-fhir/diagnosticReportSubject
+hft:diagnosticReportSubject rdf:type owl:ObjectProperty ;
+                            rdfs:subPropertyOf hft:hasSubject ;
+                            rdf:type owl:FunctionalProperty ;
+                            rdfs:domain hft:DiagnosticReport ;
+                            rdfs:range hft:Patient ;
+                            rdfs:comment "Links a DiagnosticReport to the Patient it concerns; functional subPropertyOf hft:hasSubject." ;
+                            rdfs:label "diagnostic report subject" .
+
+
+###  http://example.org/hl7-fhir/encounterSubject
+hft:encounterSubject rdf:type owl:ObjectProperty ;
+                     rdfs:subPropertyOf hft:hasSubject ;
+                     rdf:type owl:FunctionalProperty ;
+                     rdfs:domain hft:Encounter ;
+                     rdfs:range hft:Patient ;
+                     rdfs:comment "Links an Encounter the the Patient it concerns; funcional subPropertyOf hft:hasSubject." ;
+                     rdfs:label "encounter subject" .
+
+
+###  http://example.org/hl7-fhir/hasCode
+hft:hasCode rdf:type owl:ObjectProperty ;
+            rdfs:domain [ rdf:type owl:Class ;
+                          owl:unionOf ( hft:Condition
+                                        hft:Observation
+                                      )
+                        ] ;
+            rdfs:range rdfs:Resource ;
+            rdfs:comment "Links an Observation or a Condition to its concept code IRI (e.g., LOINC or ICD-10)." ;
+            rdfs:label "has code" .
+
+
+###  http://example.org/hl7-fhir/hasPart
+hft:hasPart rdf:type owl:ObjectProperty ;
+            rdfs:subPropertyOf fhir:DiagnosticReport.result ;
+            owl:inverseOf hft:partOf ;
+            rdfs:domain hft:DiagnosticReport ;
+            rdfs:range hft:Observation ;
+            rdfs:comment "DiagnosticReport includes one or more Observations; aligns to fhir:DiagnosticReport.result." ;
+            rdfs:label "has part" .
+
+
+###  http://example.org/hl7-fhir/hasSubject
+hft:hasSubject rdf:type owl:ObjectProperty ;
+               rdfs:subPropertyOf fhir:subject ;
+               rdf:type owl:FunctionalProperty ;
+               rdfs:domain [ rdf:type owl:Class ;
+                             owl:unionOf ( hft:Condition
+                                           hft:DiagnosticReport
+                                           hft:Encounter
+                                           hft:Observation
+                                           hft:ServiceRequest
+                                         )
+                           ] ;
+               rdfs:range hft:Patient ;
+               rdfs:comment "Links a Condition, DiagnosticReport, Encounter, Observation or ServiceRequest to the Patient it concerns." ;
+               rdfs:label "has subject" .
+
+
+###  http://example.org/hl7-fhir/observationSubject
+hft:observationSubject rdf:type owl:ObjectProperty ;
+                       rdfs:subPropertyOf hft:hasSubject ;
+                       rdf:type owl:FunctionalProperty ;
+                       rdfs:domain hft:Observation ;
+                       rdfs:range hft:Patient ;
+                       rdfs:comment "Links an Observation to the Patient it concerns; functional subProperty of hasSubject." ;
+                       rdfs:label "observation subject" .
+
+
+###  http://example.org/hl7-fhir/partOf
+hft:partOf rdf:type owl:ObjectProperty ;
+           rdfs:domain hft:Observation ;
+           rdfs:range hft:DiagnosticReport ;
+           rdfs:comment "One or more Observations are partOf DiagnosticReport." ;
+           rdfs:label "part of" .
+
+
+###  http://example.org/hl7-fhir/serviceRequestSubject
+hft:serviceRequestSubject rdf:type owl:ObjectProperty ;
+                          rdfs:subPropertyOf hft:hasSubject ;
+                          rdf:type owl:FunctionalProperty ;
+                          rdfs:domain hft:ServiceRequest ;
+                          rdfs:range hft:Patient ;
+                          rdfs:comment "Links a ServiceRequest to the Patient it concerns; a functional subProperty of hasSubject" ;
+                          rdfs:label "service request subject" .
+
+
+###  http://hl7.org/fhir/DiagnosticReport.result
+fhir:DiagnosticReport.result rdf:type owl:ObjectProperty .
+
+
+###  http://hl7.org/fhir/basedOn
+fhir:basedOn rdf:type owl:ObjectProperty .
+
+
+###  http://hl7.org/fhir/subject
+fhir:subject rdf:type owl:ObjectProperty .
+
+
+#################################################################
+#    Data properties
+#################################################################
+
+###  http://example.org/hl7-fhir/birthDate
+hft:birthDate rdf:type owl:DatatypeProperty ;
+              rdfs:domain hft:Patient ;
+              rdfs:range xsd:date ;
+              rdfs:comment "Patient's date of birth." ;
+              rdfs:label "birth date" .
+
+
+###  http://example.org/hl7-fhir/effectiveDateTime
+hft:effectiveDateTime rdf:type owl:DatatypeProperty ;
+                      rdfs:domain [ rdf:type owl:Class ;
+                                    owl:unionOf ( hft:DiagnosticReport
+                                                  hft:Observation
+                                                )
+                                  ] ;
+                      rdfs:range xsd:dateTime ;
+                      rdfs:comment "Clinical effective time for Observation or DiagnosticReport." ;
+                      rdfs:label "effective date time" .
+
+
+###  http://example.org/hl7-fhir/family
+hft:family rdf:type owl:DatatypeProperty ;
+           rdfs:domain hft:Patient ;
+           rdfs:range xsd:string ;
+           rdfs:comment "Patient's family (last) name." ;
+           rdfs:label "family" .
+
+
+###  http://example.org/hl7-fhir/given
+hft:given rdf:type owl:DatatypeProperty ;
+          rdfs:domain hft:Patient ;
+          rdfs:range xsd:string ;
+          rdfs:comment "Patient's given (first/middle) name token or concatenated string." ;
+          rdfs:label "given" .
+
+
+###  http://example.org/hl7-fhir/hasUnit
+hft:hasUnit rdf:type owl:DatatypeProperty ;
+            rdfs:domain hft:Observation ;
+            rdfs:range xsd:string ;
+            rdfs:comment "Unit of measure for a quantitative Observation value (e.g., % or mg/dL)." ;
+            rdfs:label "unit" .
+
+
+###  http://example.org/hl7-fhir/identifier
+hft:identifier rdf:type owl:DatatypeProperty ;
+               rdfs:domain [ rdf:type owl:Class ;
+                             owl:unionOf ( hft:Encounter
+                                           hft:Patient
+                                           hft:ServiceRequest
+                                         )
+                           ] ;
+               rdfs:range xsd:string ;
+               rdfs:comment "External identifier (MRN, encounter number, placer/filler IDs) as string." ;
+               rdfs:label "identifier" .
+
+
+###  http://example.org/hl7-fhir/issuedDateTime
+hft:issuedDateTime rdf:type owl:DatatypeProperty ;
+                   rdfs:domain hft:DiagnosticReport ;
+                   rdfs:range xsd:dateTime ;
+                   rdfs:comment "Issue/release time for a DiagnosticReport." ;
+                   rdfs:label "issued dateTime" .
+
+
+###  http://example.org/hl7-fhir/status
+hft:status rdf:type owl:DatatypeProperty ;
+           rdfs:domain [ rdf:type owl:Class ;
+                         owl:unionOf ( hft:DiagnosticReport
+                                       hft:Encounter
+                                       hft:Observation
+                                       hft:ServiceRequest
+                                     )
+                       ] ;
+           rdfs:range xsd:string ;
+           rdfs:comment "Lifecycle status (e.g., DiagnosticReport: retistered|preliminary|final|amended; Encounter, Observation, ServiceRequest similar)." ;
+           rdfs:label "status" .
+
+
+###  http://example.org/hl7-fhir/valueDecimal
+hft:valueDecimal rdf:type owl:DatatypeProperty ;
+                 rdfs:domain hft:Observation ;
+                 rdfs:range xsd:decimal ;
+                 rdfs:comment "Numeric value for a quantitative Observation." ;
+                 rdfs:label "value (decimal)" .
+
+
+###  http://example.org/hl7-fhir/valueInteger
+hft:valueInteger rdf:type owl:DatatypeProperty ;
+                 rdfs:domain hft:Observation ;
+                 rdfs:range xsd:integer ;
+                 rdfs:comment "Integer value for an Observation." ;
+                 rdfs:label "value integer" .
+
+
+###  http://example.org/hl7-fhir/valueString
+hft:valueString rdf:type owl:DatatypeProperty ;
+                rdfs:domain hft:Observation ;
+                rdfs:range xsd:string ;
+                rdfs:comment "Textual value for a qualitative Observation." ;
+                rdfs:label "value (string)" .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  http://example.org/hl7-fhir/Condition
+hft:Condition rdf:type owl:Class ;
+              rdfs:subClassOf fhir:Condition ;
+              rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:Condition" ;
+              rdfs:label "Condition" .
+
+
+###  http://example.org/hl7-fhir/DiagnosticReport
+hft:DiagnosticReport rdf:type owl:Class ;
+                    rdfs:subClassOf fhir:DiagnosticReport ;
+                     rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:DiagnosticReport." ;
+                     rdfs:label "Diagnostic report" .
+
+
+###  http://example.org/hl7-fhir/Encounter
+hft:Encounter rdf:type owl:Class ;
+              rdfs:subClassOf fhir:Encounter ;
+              rdfs:comment "Represents an encounter between a patient and a healthcare provider, aligned with fhir:Encounter." ;
+              rdfs:label "Encounter" .
+
+
+###  http://example.org/hl7-fhir/Observation
+hft:Observation rdf:type owl:Class ;
+                rdfs:subClassOf fhir:Observation ;
+                rdfs:comment "Represents an observation made with regard to a patient, aligned with fhir:Observation." ;
+                rdfs:label "Observation" .
+
+###  http://example.org/hl7-fhir/NumericObservation
+hft:NumericObservation rdf:type owl:Class ;
+                        rdfs:subClassOf hft:Observation ;
+                        rdfs:label "Numeric observation" ; 
+                        rdfs:comment "Observation whose value is numeric." .
+
+
+###  http://example.org/hl7-fhir/Patient
+hft:Patient rdf:type owl:Class ;
+            rdfs:subClassOf fhir:Patient ;
+            rdfs:comment "Represents a patient in the FHIR model, aligned with fhir:Patient." ;
+            rdfs:label "Patient" .
+
+
+###  http://example.org/hl7-fhir/ServiceRequest
+hft:ServiceRequest rdf:type owl:Class ;
+                   rdfs:subClassOf fhir:ServiceRequest ;
+                   rdfs:comment "Represents a clinical order or request for a service, procedure, or study, aligned with fhir:ServiceRequest." ;
+                   rdfs:label "Service request" .
+
+
+###  http://hl7.org/fhir/Condition
+fhir:Condition rdf:type owl:Class .
+
+
+###  http://hl7.org/fhir/DiagnosticReport
+fhir:DiagnosticReport rdf:type owl:Class .
+
+
+###  http://hl7.org/fhir/Encounter
+fhir:Encounter rdf:type owl:Class .
+
+
+###  http://hl7.org/fhir/Observation
+fhir:Observation rdf:type owl:Class .
+
+
+###  http://hl7.org/fhir/Patient
+fhir:Patient rdf:type owl:Class .
+
+
+###  http://hl7.org/fhir/ServiceRequest
+fhir:ServiceRequest rdf:type owl:Class .
+
+
+###  http://www.w3.org/2000/01/rdf-schema#Resource
+rdfs:Resource rdf:type owl:Class .
+
+
+#################################################################
+#    General axioms
+#################################################################
+
+[ rdf:type owl:AllDisjointClasses ;
+  owl:members ( hft:Condition
+                hft:DiagnosticReport
+                hft:Encounter
+                hft:Observation
+                hft:Patient
+                hft:ServiceRequest
+              )
+] .
+
+
+###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi

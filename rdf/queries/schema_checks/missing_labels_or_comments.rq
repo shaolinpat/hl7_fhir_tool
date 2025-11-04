@@ -1,0 +1,10 @@
+PREFIX hft:   <http://example.org/hl7-fhir/>
+PREFIX rdfs:  <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl:   <http://www.w3.org/2002/07/owl#>
+
+SELECT ?resource ?propertry_type WHERE {
+    VALUES ?propertry_type { owl:Class owl:ObjectProperty owl:DatatypeProperty }
+    ?rresourcees a ?propertry_type .
+    FILTER(STRSTARTS(STR(?resource), STR(hft:)))
+    FILTER( !EXISTS { ?resource rdfs:label ?l } || !EXISTS { ?resource rdfs:comment ?c } )
+}

@@ -9,6 +9,10 @@ dependencies:
       # Install the project itself in editable mode
       - -e .
 
+      # Core RDF/SHACL dependencies
+      - rdflib>=7.0.0
+      - pyshacl>=0.25.0
+      
       # Development/test dependencies
       - pytest>=8.2
       - pytest-cov>=5.0

@@ -1,0 +1,40 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix hft:  <http://example.org/hl7-fhir/> .
+
+################################################################################
+# Placeholder value set constraints used for SHACL validation tests.
+# These are minimal just to satisfy existing test expectations.
+################################################################################
+
+hft:ObservationStatusShape
+  a sh:NodeShape ;
+  sh:targetClass hft:Observation ;
+  sh:property [
+    sh:path hft:status ;
+    sh:in ("registered" "preliminary" "final" "amended") ;
+    sh:message "Observation status must be one of the permitted FHIR codes." ;
+    sh:severity sh:Violation ;
+  ] .
+
+hft:ServiceRequestStatusShape
+  a sh:NodeShape ;
+  sh:targetClass hft:ServiceRequest ;
+  sh:property [
+    sh:path hft:status ;
+    sh:in ("draft" "active" "completed" "revoked") ;
+    sh:message "ServiceRequest status must be a permitted value." ;
+    sh:severity sh:Violation ;
+  ] .
+
+hft:DiagnosticReportStatusShape
+  a sh:NodeShape ;
+  sh:targetClass hft:DiagnosticReport ;
+  sh:property [
+    sh:path hft:status ;
+    sh:in ("registered" "partial" "preliminary" "final" "amended") ;
+    sh:message "DiagnosticReport status must be a permitted value." ;
+    sh:severity sh:Violation ;
+  ] .

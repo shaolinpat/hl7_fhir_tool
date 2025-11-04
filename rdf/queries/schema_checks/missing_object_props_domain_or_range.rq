@@ -1,0 +1,9 @@
+PREFIX hft:   <http://example.org/hl7-fhir/>
+PREFIX rdfs:  <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl:   <http://www.w3.org/2002/07/owl#>
+
+SELECT ?property WHERE {
+    ?property a owl:ObjectProperty .
+    FILTER(STRSTARTS(STR(?property), STR(hft:)))
+    FILTER( !EXISTS { ?property rdfs:domain ?d } || !EXISTS { ?property rdfs:range ?r } )
+}

@@ -1,0 +1,46 @@
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix hft:    <http://example.org/hl7-fhir/> .
+@prefix loinc:  <http://loinc.org/> .
+
+# core numeric constraints for HbA1c observations
+hft:ObservationA1cNumericShape
+  a sh:NodeShape ;
+  sh:targetClass hft:Observation ;
+  sh:closed false ;
+  sh:property [
+    sh:path hft:valueDecimal ;
+    sh:minCount 1 ;
+    sh:datatype xsd:decimal ;
+    sh:message "HbA1c Observation must have hft:valueDecimal (xsd:decimal)." ;
+    sh:severity sh:Violation
+  ] ;
+  sh:property [
+    sh:path hft:hasUnit ;
+    sh:minCount 1 ;
+    sh:datatype xsd:string ;
+    sh:message "HbA1c Observation must include hft:hasUnit (e.g., \"%\")." ;
+    sh:severity sh:Violation
+  ] .
+
+# cohort threshold -- flagged (Warning) rather than hard fail
+hft:ObservationA1cThresholdShape
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX hft:   <http://example.org/hl7-fhir/>
+      PREFIX loinc: <http://loinc.org/>
+      SELECT ?this WHERE {
+        ?this a hft:Observation ; hft:hasCode loinc:4548-4 .
+      }
+    """
+  ] ;
+  sh:property [
+    sh:path hft:valueDecimal ;
+    sh:minCount 1 ;
+    sh:datatype xsd:decimal ;
+    sh:minExclusive "8.0"^^xsd:decimal ;
+    sh:message "Cohort rule: HbA1c must be > 8.0 (hft:valueDecimal)." ;
+    sh:severity sh:Warning
+  ] .

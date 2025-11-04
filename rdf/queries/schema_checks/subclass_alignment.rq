@@ -1,0 +1,15 @@
+PREFIX hft:  <http://example.org/hl7-fhir/>
+PREFIX fhir: <http://hl7.org/fhir/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?hft ?expected WHERE {
+  VALUES (?hft ?expected) {
+    (hft:Patient fhir:Patient)
+    (hft:Condition fhir:Condition)
+    (hft:DiagnosticReport fhir:DiagnosticReport)
+    (hft:Encounter fhir:Encounter)
+    (hft:Observation fhir:Observation)
+    (hft:ServiceRequest fhir:ServiceRequest)
+  }
+  FILTER NOT EXISTS { ?hft rdfs:subClassOf ?expected }
+}

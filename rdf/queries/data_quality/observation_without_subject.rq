@@ -1,0 +1,6 @@
+PREFIX hft: <http://example.org/hl7-fhir/>
+
+SELECT ?observation WHERE {
+    ?observation a hft:Observation .
+    FILTER NOT EXISTS { ?observation hft:observationSubject ?p }
+}

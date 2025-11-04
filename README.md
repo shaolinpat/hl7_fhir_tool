@@ -30,6 +30,11 @@ This project demonstrates healthcare data parsing, normalization, and CLI design
 - [Development](#development)
 - [Continuous Integration](#continuous-integration)
 - [Status](#status)
+
+- [Ontology](#ontology)
+- [SPARQL Testing](#sparql-testing)
+- [SHACL Testing](#shacl-testing)
+
 - [License](#license)
 
 ---
@@ -475,6 +480,80 @@ This project is an evolving prototype interoperability toolkit, positioned at th
 - Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design, and integration pathways for Java ecosystems.
 
 This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.
+
+---
+
+
+---
+
+## Ontology
+
+The **ontology** defines the RDF model that underpins HL7 → FHIR transformations.  
+It lives in `rdf/ontology/hl7_fhir_tool_schema.ttl` and includes:
+
+- **Core classes:** `Patient`, `Encounter`, `Observation`, `Condition`, `ServiceRequest`, and `DiagnosticReport`  
+- **Object properties:** `hasSubject`, `hasCode`, `hasPart`, `basedOn`, etc.  
+- **Data properties:** `identifier`, `birthDate`, `status`, `valueDecimal`, and related attributes  
+
+These definitions ensure semantic integrity between transformed FHIR data and their relationships in RDF.  
+Open it in **Protégé** or **TopBraid** for exploration or editing.
+
+```bash
+protege rdf/ontology/hl7_fhir_tool_schema.ttl
+```
+
+---
+
+## SPARQL Testing
+
+SPARQL queries verify schema consistency, data quality, and analytic cohorts.  
+Queries live under `rdf/queries/` and are grouped into subfolders:
+
+| Directory | Purpose |
+|------------|----------|
+| `schema_checks/` | Structural validation of ontology (e.g., missing labels, misaligned subclasses) |
+| `data_quality/` | Detect missing or invalid instance data (e.g., missing subjects, values, or codes) |
+| `cohorts/` | Cohort definitions and clinical logic (e.g., Diabetes + HbA1c > 8.0) |
+
+Run all SPARQL checks using Apache Jena’s **ARQ** engine:
+
+```bash
+bash tools/run_sparql_checks.sh
+```
+
+Example output excerpt:
+```bash
+== Cohorts (expect rows) ==
+>>> rdf/queries/cohorts/cohort_e11_9_hba1c_over_8.rq
+?patient  ?value
+exi:Patient_p1001  "8.6"^^xsd:decimal
+```
+
+Schema and data-quality checks should return **no rows** (PASS).  
+Cohort queries should return matching instances.
+
+---
+
+## SHACL Testing
+
+SHACL shapes enforce structural and semantic conformance against the ontology.  
+Shapes are organized under `rdf/shapes/`:
+
+| Directory | Purpose |
+|------------|----------|
+| `data_checks/` | Instance-level data rules (subjects, values, units, relationships) |
+| `schema_checks/` | Ontology-aligned schema-level rules |
+
+Run SHACL validation via **pySHACL**:
+
+```bash
+python tools/run_shacl.py   --data rdf/instances/cohort_diabetes_e11_9_hb1ac_over_8.ttl   --shapes rdf/shapes/data_checks/*.ttl rdf/shapes/schema_checks/*.ttl   --inference rdfs   --report-out outputs/shacl_report.ttl
+```
+
+**Interpreting results:**
+- `Conforms: True` → all shapes satisfied.  
+- Warnings (e.g., HbA1c > 8.0) flag analytic exceptions but don’t fail validation.  
+- Change `sh:severity sh:Warning` to `sh:severity sh:Violation` to make failures non-conforming.
 
 ---
 

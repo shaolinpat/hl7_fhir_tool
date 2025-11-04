@@ -1,0 +1,8 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+[] a sh:NodeShape ;
+  sh:targetQuery "SELECT ?this WHERE { ?this a owl:ObjectProperty . }" ;
+  sh:property [ sh:path rdfs:domain ; sh:minCount 1 ; sh:message "ObjectProperty missing rdfs:domain." ; sh:severity sh:Warning ] ;
+  sh:property [ sh:path rdfs:range  ; sh:minCount 1 ; sh:message "ObjectProperty missing rdfs:range."  ; sh:severity sh:Warning ] .

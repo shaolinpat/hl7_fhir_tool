@@ -52,3 +52,14 @@ tools/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# rdf
+workspace/
+
+
+# Generated or local output
+outputs/
+docs/
+docs/_build/
+docs/.doctrees/
+docs/site/

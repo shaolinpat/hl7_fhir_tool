@@ -1,0 +1,7 @@
+PREFIX hft:  <http://example.org/hl7-fhir/>
+
+SELECT ?observation WHERE {
+    ?observation a hft:Observation ;
+                 hft:hasUnit ?u . 
+    FILTER (!EXISTS { ?observation hft:valueDecimal ?v } && !EXISTS { ?observation hft:valueInteger ?i } )
+}

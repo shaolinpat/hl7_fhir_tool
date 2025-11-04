@@ -1,0 +1,46 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix hft:  <http://example.org/hl7-fhir/> .
+
+hft:DiagnosticReportPartsShape
+  a sh:NodeShape ;
+  sh:targetClass hft:DiagnosticReport ;
+  sh:closed false ;
+  # DR must be about a Patient
+  sh:property [
+    sh:path hft:diagnosticReportSubject ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class hft:Patient ;
+    sh:message "DiagnosticReport must reference a Patient via hft:diagnosticReportSubject." ;
+    sh:severity sh:Violation
+  ] ;
+  # DR must include >= 1 Observation
+  sh:property [
+    sh:path hft:hasPart ;
+    sh:minCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class hft:Observation ;
+    sh:message "DiagnosticReport should include >= 1 hft:Observation via hft:hasPart." ;
+    sh:severity sh:Violation
+  ] ;
+  # optional linkage to ServiceRequest
+  sh:property [
+    sh:path hft:basedOn ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class hft:ServiceRequest ;
+    sh:message "If present, hft:basedOn should point to a hft:ServiceRequest." ;
+    sh:severity sh:Warning
+  ] ;
+  # typed admin fields if present
+  sh:property [
+    sh:path hft:issuedDateTime ; sh:maxCount 1 ; sh:datatype xsd:dateTime ;
+    sh:message "If present, hft:issuedDateTime must be xsd:dateTime." ;
+    sh:severity sh:Violation
+  ] ;
+  sh:property [
+    sh:path hft:status ; sh:maxCount 1 ; sh:datatype xsd:string ;
+    sh:message "If present, hft:status must be a string." ;
+    sh:severity sh:Violation
+  ] .

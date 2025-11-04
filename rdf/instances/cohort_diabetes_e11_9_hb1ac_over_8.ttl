@@ -1,0 +1,83 @@
+@prefix hft:   <http://example.org/hl7-fhir/> .
+@prefix exi:   <http://example.org/hl7-fhir/i/> .  # instances
+@prefix loinc: <http://loinc.org/> .
+@prefix icd10: <http://hl7.org/fhir/sid/icd-10-cm/> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+################################################################################
+# Patient 1 -- should be returned by the cohort (E11.9 + HbA1c 8.6)
+################################################################################
+
+exi:Patient_p1001
+  a hft:Patient ;
+  hft:family "Nguyen" ;
+  hft:given "Lan" ;
+  hft:birthDate "1972-03-10"^^xsd:date ;
+  hft:identifier "MRN-1001" .
+
+exi:Encounter_e2001
+  a hft:Encounter ;
+  hft:encounterSubject exi:Patient_p1001 ;
+  hft:identifier "ENC-2001" ;
+  hft:hasCondition exi:Condition_c3001 .
+
+exi:Condition_c3001
+  a hft:Condition ;
+  hft:conditionSubject exi:Patient_p1001 ;
+  hft:hasCode icd10:E11.9 .
+
+# HbA1c observation (LOINC 4548-4) with value > 8.0
+exi:Observation_o4001
+  a hft:Observation ;
+  hft:observationSubject exi:Patient_p1001 ;
+  hft:hasCode loinc:4548-4 ;
+  hft:valueDecimal "8.6"^^xsd:decimal ;
+  hft:hasUnit "%" ;
+  hft:effectiveDateTime "2024-09-14T08:45:00Z"^^xsd:dateTime .
+
+# Optional: DiagnosticReport that includes the observation and is based on a ServiceRequest
+exi:ServiceRequest_sr5001
+  a hft:ServiceRequest ;
+  hft:serviceRequestSubject exi:Patient_p1001 ;
+  hft:status "completed" ;
+  hft:identifier "SR-5001" .
+
+exi:DiagnosticReport_dr6001
+  a hft:DiagnosticReport ;
+  hft:diagnosticReportSubject exi:Patient_p1001 ;
+  hft:hasPart exi:Observation_o4001 ;
+  hft:basedOn exi:ServiceRequest_sr5001 ;
+  hft:issuedDateTime "2024-09-14T12:10:00Z"^^xsd:dateTime ;
+  hft:status "final" ;
+  hft:identifier "DR-6001" .
+
+################################################################################
+# Patient 2 -- should NOT be returned (A1c 6.1)
+################################################################################
+
+exi:Patient_p1002
+  a hft:Patient ;
+  hft:family "Santos" ;
+  hft:given "Marisol" ;
+  hft:birthDate "1985-11-02"^^xsd:date ;
+  hft:identifier "MRN-1002" .
+
+exi:Encounter_e2002
+  a hft:Encounter ;
+  hft:encounterSubject exi:Patient_p1002 ;
+  hft:identifier "ENC-2002" ;
+  hft:hasCondition exi:Condition_c3002 .
+
+exi:Condition_c3002
+  a hft:Condition ;
+  hft:conditionSubject exi:Patient_p1002 ;
+  hft:hasCode icd10:E11.9 .
+
+# HbA1c observation below threshold
+exi:Observation_o4002
+  a hft:Observation ;
+  hft:observationSubject exi:Patient_p1002 ;
+  hft:hasCode loinc:4548-4 ;
+  hft:valueDecimal "6.1"^^xsd:decimal ;
+  hft:hasUnit "%" ;
+  hft:effectiveDateTime "2024-08-02T09:20:00Z"^^xsd:dateTime .

@@ -1,0 +1,20 @@
+PREFIX hft: <http://example.org/hl7-fhir/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+# Returns any clases that is expected to be in the disjoint set but is not.
+
+SELECT ?unexpected WHERE {
+    VALUES ?unexpected {
+        hft:Patient 
+        hft:Condition
+        hft:Encounter
+        hft:Observation
+        hft:DiagnosticReport
+        hft:ServiceRequest
+    }
+    FILTER NOT EXISTS {
+        [] a owl:AllDisjointClasses ;
+           owl:members/rdf:rest*/rdf:first ?unexpected .
+    }
+}

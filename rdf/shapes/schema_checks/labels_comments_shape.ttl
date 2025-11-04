@@ -1,0 +1,8 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+[] a sh:NodeShape ;
+  sh:targetQuery "SELECT ?this WHERE { ?this a owl:Class . FILTER(?this != owl:Thing) }" ;
+  sh:property [ sh:path rdfs:label ;   sh:minCount 1 ; sh:message "Class missing rdfs:label." ;   sh:severity sh:Violation ] ;
+  sh:property [ sh:path rdfs:comment ; sh:minCount 1 ; sh:message "Class missing rdfs:comment." ; sh:severity sh:Warning ] .
