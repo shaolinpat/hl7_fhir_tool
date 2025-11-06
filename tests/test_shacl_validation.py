@@ -6,11 +6,22 @@ for glucose observations.
 """
 import os
 import pytest
+import subprocess
+import sys
+
+from pathlib import Path
 from rdflib import Graph
 from pyshacl import validate
 
+# ------------------------------------------------------------------------------
+# globals
+# ------------------------------------------------------------------------------
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(BASE, ".."))
+RUNNER = os.path.join(ROOT, "tools", "run_shacl.py")
+VALID = os.path.join(ROOT, "tests", "data", "fhir_valid.ttl")
+INVALID = os.path.join(ROOT, "tests", "data", "fhir_bad_values.ttl")
 
 SHAPES = [
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/00_namespaces.ttl"),
@@ -18,6 +29,13 @@ SHAPES = [
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/20_core_shapes.ttl"),
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/30_profile_lab.ttl"),
 ]
+
+PY = sys.executable
+
+
+# ------------------------------------------------------------------------------
+# helpers
+# ------------------------------------------------------------------------------
 
 
 def _validate(data_rel, shapes=SHAPES):
@@ -41,6 +59,11 @@ def _validate(data_rel, shapes=SHAPES):
     return conforms, r_text
 
 
+# ------------------------------------------------------------------------------
+# tests
+# ------------------------------------------------------------------------------
+
+
 @pytest.mark.parametrize("fname", ["fhir_valid.ttl"])
 def test_valid_conforms(fname):
     ok, report = _validate(fname)
@@ -58,3 +81,35 @@ def test_invalid_violates(fname, needle):
     ok, report = _validate(fname)
     assert not ok, "Expected invalid graph to violate shapes."
     assert needle in report or "Violation" in report
+
+
+def test_cli_valid_exits_zero(tmp_path):
+    out = tmp_path / "report_valid.ttl"
+    cmd = [
+        PY,
+        RUNNER,
+        "--data",
+        VALID,
+        "--shapes",
+        *SHAPES,
+        "--report-out",
+        str(out),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0, res.stdout + "\n" + res.stderr
+
+
+def test_cli_invalid_exits_nonzero(tmp_path):
+    out = tmp_path / "report_invalid.ttl"
+    cmd = [
+        PY,
+        RUNNER,
+        "--data",
+        INVALID,
+        "--shapes",
+        *SHAPES,
+        "--report-out",
+        str(out),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode != 0, res.stdout + "\n" + res.stderr
