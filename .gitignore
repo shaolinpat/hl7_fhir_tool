@@ -33,7 +33,7 @@ htmlcov/
 #tests/data
 
 # tools/
-tools/
+#tools/
 
 # Type checker / linter caches
 .mypy_cache/
