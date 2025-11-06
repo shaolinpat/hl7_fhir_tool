@@ -499,7 +499,7 @@ These definitions ensure semantic integrity between transformed FHIR data and th
 Open it in **Protégé** or **TopBraid** for exploration or editing.
 
 ```bash
-protege rdf/ontology/hl7_fhir_tool_schema.ttl
+protege "file://$PWD/rdf/ontology/hl7_fhir_tool_schema.ttl"
 ```
 
 ---

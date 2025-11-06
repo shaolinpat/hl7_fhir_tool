@@ -76,6 +76,15 @@ hft:hasCode rdf:type owl:ObjectProperty ;
             rdfs:label "has code" .
 
 
+###  http://example.org/hl7-fhir/hasCondition
+hft:hasCondition rdf:type owl:ObjectProperty ;
+                 rdfs:domain hft:Encounter ;
+                 rdfs:range hft:Condition ;
+                 rdfs:subPropertyOf fhir:Encounter.reasonReference ;
+                 rdfs:comment "Convenience link: Encounter -> Condition (aliasing the idea of diagnosis/reason). In FHIR RDF this is normally nested under Encounter.diagnosis.* or via reasonReference." ;
+                 rdfs:label "has condition" .
+
+
 ###  http://example.org/hl7-fhir/hasPart
 hft:hasPart rdf:type owl:ObjectProperty ;
             rdfs:subPropertyOf fhir:DiagnosticReport.result ;
@@ -263,7 +272,7 @@ hft:Condition rdf:type owl:Class ;
 
 ###  http://example.org/hl7-fhir/DiagnosticReport
 hft:DiagnosticReport rdf:type owl:Class ;
-                    rdfs:subClassOf fhir:DiagnosticReport ;
+                     rdfs:subClassOf fhir:DiagnosticReport ;
                      rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:DiagnosticReport." ;
                      rdfs:label "Diagnostic report" .
 
@@ -275,17 +284,18 @@ hft:Encounter rdf:type owl:Class ;
               rdfs:label "Encounter" .
 
 
+###  http://example.org/hl7-fhir/NumericObservation
+hft:NumericObservation rdf:type owl:Class ;
+                       rdfs:subClassOf hft:Observation ;
+                       rdfs:comment "Observation whose value is numeric." ;
+                       rdfs:label "Numeric observation" .
+
+
 ###  http://example.org/hl7-fhir/Observation
 hft:Observation rdf:type owl:Class ;
                 rdfs:subClassOf fhir:Observation ;
                 rdfs:comment "Represents an observation made with regard to a patient, aligned with fhir:Observation." ;
                 rdfs:label "Observation" .
-
-###  http://example.org/hl7-fhir/NumericObservation
-hft:NumericObservation rdf:type owl:Class ;
-                        rdfs:subClassOf hft:Observation ;
-                        rdfs:label "Numeric observation" ; 
-                        rdfs:comment "Observation whose value is numeric." .
 
 
 ###  http://example.org/hl7-fhir/Patient

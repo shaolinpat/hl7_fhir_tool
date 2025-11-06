@@ -6,7 +6,7 @@
 @prefix fhir: <http://hl7.org/fhir/> .
 
 ################################################################################
-# Core structural constraints (keep)
+# Core structural constraints
 ################################################################################
 
 hft:PatientShape
@@ -17,6 +17,7 @@ hft:PatientShape
     sh:minCount 1 ;
     sh:datatype xsd:string ;
     sh:message "Patient must have an identifier (string)." ;
+    sh:severity sh:Violation ;
   ] .
 
 hft:ObservationSubjectShape
@@ -25,7 +26,10 @@ hft:ObservationSubjectShape
   sh:property [
     sh:path hft:observationSubject ;
     sh:minCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class hft:Patient ;
     sh:message "Observation must link to a Patient via hft:observationSubject." ;
+    sh:severity sh:Violation ;
   ] .
 
 hft:DiagnosticReportHasPartShape
@@ -34,21 +38,21 @@ hft:DiagnosticReportHasPartShape
   sh:property [
     sh:path hft:hasPart ;
     sh:minCount 1 ;
+    sh:class hft:Observation ;
     sh:message "DiagnosticReport must include at least one Observation via hft:hasPart." ;
+    sh:severity sh:Violation ;
   ] .
 
 ################################################################################
 # Enforcement to make the test 'bad' graphs actually violate
-# (targets both hft:Observation and fhir:Observation via SPARQLTarget,
-#  but shapes themselves remain canonically under hft:)
+# (targets both hft:Observation and fhir:Observation via targetClass duals;
+# shapes remain canonically under hft:)
 ################################################################################
 
 hft:ObservationClosedShape
   a sh:NodeShape ;
-  sh:target [
-    a sh:SPARQLTarget ;
-    sh:select "PREFIX hft: <http://example.org/hl7-fhir/> PREFIX fhir: <http://hl7.org/fhir/> SELECT ?this WHERE { ?this a ?t . FILTER(?t IN (hft:Observation, fhir:Observation)) }" ;
-  ] ;
+  sh:targetClass hft:Observation ;
+  sh:targetClass fhir:Observation ;
   sh:closed true ;
   # Allow the legit properties used in your valid graphs; anything else will violate.
   sh:ignoredProperties (
@@ -72,13 +76,20 @@ hft:ObservationClosedShape
   sh:message "Observation contains unexpected property (closed shape violation)." ;
   sh:severity sh:Violation .
 
+hft:ObservationHasCodeRequired
+  a sh:NodeShape ;
+  sh:targetClass hft:Observation , fhir:Observation ;
+  sh:property [
+    sh:path [ sh:alternativePath ( hft:hasCode fhir:code ) ] ;
+    sh:minCount 1 ;
+    sh:message "Observation must have a coded concept (hasCode/code)." ;
+    sh:severity sh:Violation ;
+  ] .
 
 hft:ObservationStatusEnumerationShape
   a sh:NodeShape ;
-  sh:target [
-    a sh:SPARQLTarget ;
-    sh:select "PREFIX hft: <http://example.org/hl7-fhir/> PREFIX fhir: <http://hl7.org/fhir/> SELECT ?this WHERE { ?this a ?t . FILTER(?t IN (hft:Observation, fhir:Observation)) }" ;
-  ] ;
+  sh:targetClass hft:Observation ;
+  sh:targetClass fhir:Observation ;
   sh:property [
     sh:path [ sh:alternativePath ( hft:status fhir:status ) ] ;
     sh:in ( "registered" "preliminary" "final" "amended" ) ;
@@ -86,17 +97,14 @@ hft:ObservationStatusEnumerationShape
     sh:severity sh:Violation ;
   ] .
 
-
 ################################################################################
 # Closed shape for DiagnosticReport (catches extra/bogus predicates)
 ################################################################################
 
 hft:DiagnosticReportClosedShape
   a sh:NodeShape ;
-  sh:target [
-    a sh:SPARQLTarget ;
-    sh:select "PREFIX hft: <http://example.org/hl7-fhir/> PREFIX fhir: <http://hl7.org/fhir/> SELECT ?this WHERE { ?this a ?t . FILTER(?t IN (hft:DiagnosticReport, fhir:DiagnosticReport)) }" ;
-  ] ;
+  sh:targetClass hft:DiagnosticReport ;
+  sh:targetClass fhir:DiagnosticReport ; 
   sh:closed true ;
   sh:ignoredProperties (
     rdf:type
@@ -116,7 +124,7 @@ hft:DiagnosticReportClosedShape
     fhir:status
     fhir:issued
   ) ;
-  sh:message "DiagnosticReport contains unexpected property (closed shape violation)." ;
+  sh:message "DiagnosticReport contains unexpected property (closed-shape violation)." ;
   sh:severity sh:Violation .
 
 ################################################################################
@@ -125,10 +133,12 @@ hft:DiagnosticReportClosedShape
 
 hft:StatusEnumerationShape
   a sh:NodeShape ;
-  sh:target [
-    a sh:SPARQLTarget ;
-    sh:select "PREFIX hft: <http://example.org/hl7-fhir/> PREFIX fhir: <http://hl7.org/fhir/> SELECT ?this WHERE { ?this a ?t . FILTER(?t IN (hft:Observation, fhir:Observation, hft:ServiceRequest, fhir:ServiceRequest, hft:DiagnosticReport, fhir:DiagnosticReport)) }" ;
-  ] ;
+  sh:targetClass hft:Observation ;
+  sh:targetClass fhir:Observation ;
+  sh:targetClass hft:ServiceRequest ; 
+  sh:targetClass fhir:ServiceRequest ; 
+  sh:targetClass hft:DiagnosticReport ;
+  sh:targetClass fhir:DiagnosticReport ;
   sh:property [
     sh:path [ sh:alternativePath ( hft:status fhir:status ) ] ;
     # Union of permitted codes across the three resource types
@@ -140,8 +150,7 @@ hft:StatusEnumerationShape
     sh:severity sh:Violation ;
   ] .
 
-
-  ################################################################################
+################################################################################
 # Close the remaining core resource types (target both hft:* and fhir:*)
 # These whitelists mirror what your fhir_valid.ttl actually uses.
 ################################################################################
@@ -158,8 +167,8 @@ hft:PatientClosedShape
     # fhir-side seen in fixtures
     fhir:identifier fhir:gender fhir:birthDate rdfs:label
   ) ;
-  sh:severity sh:Violation ;
-  sh:message "Patient contains an unexpected property (closed shape violation)." .
+  sh:message "Patient contains an unexpected property (closed-shape violation)." ;
+  sh:severity sh:Violation .
 
 # ENCOUNTER
 hft:EncounterClosedShape
@@ -169,12 +178,32 @@ hft:EncounterClosedShape
   sh:ignoredProperties (
     rdf:type
     # hft-side
-    hft:encounterSubject hft:hasSubject hft:identifier hft:status
+    hft:encounterSubject hft:hasSubject hft:identifier hft:status hft:hasCondition
     # fhir-side
     fhir:subject fhir:status
   ) ;
-  sh:severity sh:Violation ;
-  sh:message "Encounter contains an unexpected property (closed shape violation)." .
+  sh:message "Encounter contains an unexpected property (closed-shape violation)." ;
+  sh:severity sh:Violation .
+
+ hft:EncounterSubjectRequired
+  a sh:NodeShape ;
+  sh:targetClass hft:Encounter , fhir:Encounter ;
+  sh:property [
+    sh:path [ sh:alternativePath (hft:encounterSubject fhir:subject ) ] ;
+    sh:minCount 1;
+    sh:message "Encounter must reference a Patient (encounterSubject/subject)." ;
+    sh:severity sh:Violation ;
+  ] .
+
+  hft:EncounterHasConditionType
+    a sh:NodeShape ;
+    sh:targetClass hft:Encounter , fhir:Encounter ;
+    sh:property [
+      sh:path hft:hasCondition ;
+      sh:class hft:Condition ;
+      sh:message "Encounter hasCondition must point to a hft:Condition." ;
+      sh:severity sh:Violation ;
+    ] .
 
 # SERVICEREQUEST
 hft:ServiceRequestClosedShape
@@ -188,8 +217,8 @@ hft:ServiceRequestClosedShape
     # fhir-side
     fhir:subject fhir:code fhir:status fhir:intent
   ) ;
-  sh:severity sh:Violation ;
-  sh:message "ServiceRequest contains an unexpected property (closed shape violation)." .
+  sh:message "ServiceRequest contains an unexpected property (closed-shape violation)." ;
+  sh:severity sh:Violation .
 
 # CONDITION
 hft:ConditionClosedShape
@@ -203,9 +232,5 @@ hft:ConditionClosedShape
     # fhir-side (code/subject equivalents)
     fhir:code fhir:subject
   ) ;
-  sh:severity sh:Violation ;
-  sh:message "Condition contains an unexpected property (closed shape violation)." .
-
-# OBSERVATION — keep your existing hft:ObservationClosedShape; not redefining here.
-
-# DIAGNOSTICREPORT — keep your existing hft:DiagnosticReportClosedShape; not redefining here.
+  sh:message "Condition contains an unexpected property (closed-shape violation)." ;
+  sh:severity sh:Violation .
