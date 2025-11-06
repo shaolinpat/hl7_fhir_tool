@@ -19,9 +19,10 @@ from pyshacl import validate
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(BASE, ".."))
-RUNNER = os.path.join(ROOT, "tools", "run_shacl.py")
 VALID = os.path.join(ROOT, "tests", "data", "fhir_valid.ttl")
 INVALID = os.path.join(ROOT, "tests", "data", "fhir_bad_values.ttl")
+# RUNNER = _find_runner()
+
 
 SHAPES = [
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/00_namespaces.ttl"),
@@ -59,6 +60,19 @@ def _validate(data_rel, shapes=SHAPES):
     return conforms, r_text
 
 
+def _find_runner():
+    candidates = [
+        os.path.join(ROOT, "tools", "run_shacl.py"),
+        os.path.abspath(os.path.join(ROOT, "..", "tools", "run_shacl.py")),
+        os.path.abspath(os.path.join(BASE, "..", "..", "tools", "run_shacl.py")),
+    ]
+
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return ""
+
+
 # ------------------------------------------------------------------------------
 # tests
 # ------------------------------------------------------------------------------
@@ -87,7 +101,7 @@ def test_cli_valid_exits_zero(tmp_path):
     out = tmp_path / "report_valid.ttl"
     cmd = [
         PY,
-        RUNNER,
+        _find_runner(),
         "--data",
         VALID,
         "--shapes",
@@ -103,7 +117,7 @@ def test_cli_invalid_exits_nonzero(tmp_path):
     out = tmp_path / "report_invalid.ttl"
     cmd = [
         PY,
-        RUNNER,
+        _find_runner(),
         "--data",
         INVALID,
         "--shapes",
