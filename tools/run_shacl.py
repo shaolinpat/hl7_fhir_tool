@@ -323,6 +323,16 @@ def main() -> None:
         suite_total += 1
         data_g = _load_graph(data_path, args.format)
 
+        ontology_path = Path("rdf/ontology/hl7_fhir_tool_schema.ttl")
+        if ontology_path.exists():
+            try:
+                data_g.parse(str(ontology_path), format="turtle")
+            except Exception as exc:
+                print(
+                    f"[WARN] Could not parse ontology {ontology_path} ({exc})",
+                    file=sys.stderr,
+                )
+
         conforms, results_graph, results_text = validate(
             data_graph=data_g,
             shacl_graph=shapes_g,

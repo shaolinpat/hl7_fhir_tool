@@ -15,7 +15,7 @@ hft:LabObservationShape
   sh:targetClass hft:Observation ;
   sh:property [
     sh:path hft:hasCode ;
-    sh:in (loinc:4548-4) ;
+    sh:in (loinc:4548-4 loinc:2345-7 loinc:2951-2) ;
     sh:message "Laboratory Observation must have a permitted LOINC code (e.g., HbA1c 4548-4)." ;
     sh:severity sh:Violation ;
   ] ;

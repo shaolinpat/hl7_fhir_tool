@@ -12,6 +12,10 @@ import sys
 from pathlib import Path
 from rdflib import Graph
 from pyshacl import validate
+from rdflib import URIRef
+
+from rdflib import Graph, URIRef, Namespace
+from rdflib.namespace import RDF
 
 # ------------------------------------------------------------------------------
 # globals
@@ -21,12 +25,11 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(BASE, ".."))
 VALID = os.path.join(ROOT, "tests", "data", "fhir_valid.ttl")
 INVALID = os.path.join(ROOT, "tests", "data", "fhir_bad_values.ttl")
-# RUNNER = _find_runner()
-
+DATA = os.path.join(ROOT, "tests/data/fhir_valid.ttl")
 
 SHAPES = [
+    os.path.join(ROOT, "rdf/ontology/hl7_fhir_tool_schema.ttl"),
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/00_namespaces.ttl"),
-    os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/10_valuesets.ttl"),
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/20_core_shapes.ttl"),
     os.path.join(ROOT, "src/hl7_fhir_tool/shacl/modules/30_profile_lab.ttl"),
 ]
@@ -42,9 +45,26 @@ PY = sys.executable
 def _validate(data_rel, shapes=SHAPES):
     data = os.path.join(BASE, "data", data_rel)
     dg = Graph().parse(data, format="turtle")
+
+    # --------------------------------------------------------------------------
+    # Include enumerations (hft:male, hft:female, etc.) as data facts
+    # so that sh:class hft:AdminstrativeGenderCode succeeds.
+    # --------------------------------------------------------------------------
+    ontology_path = os.path.join(ROOT, "rdf/ontology/hl7_fhir_tool_schema.ttl")
+    if os.path.exists(ontology_path):
+        dg += Graph().parse(ontology_path, format="turtle")
+
     sg = Graph()
     for s in shapes:
         sg += Graph().parse(s, format="turtle")
+
+    print("---- DEBUG: triples containing AdministrativeGenderCode ----")
+    for s, p, o in dg.triples(
+        (None, RDF.type, URIRef("http://example.org/hl7-fhir/AdministrativeGenderCode"))
+    ):
+        print(s, "is a AdministrativeGenderCode")
+    print("---- DEBUG: total triples in data graph:", len(dg))
+
     conforms, r_graph, r_text = validate(
         data_graph=dg,
         shacl_graph=sg,

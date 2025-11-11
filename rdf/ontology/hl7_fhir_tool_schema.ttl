@@ -6,8 +6,6 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix fhir: <http://hl7.org/fhir/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix icd10: <http://hl7.org/fhir/sid/icd-10-cm/> .
-@prefix loinc: <http://loinc.org/> .
 @base <http://example.org/hl7-fhir-tool#> .
 
 <http://example.org/hl7-fhir-tool> rdf:type owl:Ontology ;
@@ -64,6 +62,15 @@ hft:encounterSubject rdf:type owl:ObjectProperty ;
                      rdfs:label "encounter subject" .
 
 
+###  http://example.org/hl7-fhir/gender
+hft:gender rdf:type owl:ObjectProperty ;
+           rdfs:subPropertyOf fhir:gender ;
+           rdfs:domain hft:Patient ;
+           rdfs:range hft:AdministrativeGenderCode ;
+           rdfs:comment "Administrative gender of the patient, representing the gender recorded for administrative or clinical purposes (male, female, other, unknown). This may differ from gender identity and is used in clinical, epidemiolical, and operational contexts." ;
+           rdfs:label "administrative gender" .
+
+
 ###  http://example.org/hl7-fhir/hasCode
 hft:hasCode rdf:type owl:ObjectProperty ;
             rdfs:domain [ rdf:type owl:Class ;
@@ -78,9 +85,9 @@ hft:hasCode rdf:type owl:ObjectProperty ;
 
 ###  http://example.org/hl7-fhir/hasCondition
 hft:hasCondition rdf:type owl:ObjectProperty ;
+                 rdfs:subPropertyOf fhir:Encounter.reasonReference ;
                  rdfs:domain hft:Encounter ;
                  rdfs:range hft:Condition ;
-                 rdfs:subPropertyOf fhir:Encounter.reasonReference ;
                  rdfs:comment "Convenience link: Encounter -> Condition (aliasing the idea of diagnosis/reason). In FHIR RDF this is normally nested under Encounter.diagnosis.* or via reasonReference." ;
                  rdfs:label "has condition" .
 
@@ -144,8 +151,16 @@ hft:serviceRequestSubject rdf:type owl:ObjectProperty ;
 fhir:DiagnosticReport.result rdf:type owl:ObjectProperty .
 
 
+###  http://hl7.org/fhir/Encounter.reasonReference
+fhir:Encounter.reasonReference rdf:type owl:ObjectProperty .
+
+
 ###  http://hl7.org/fhir/basedOn
 fhir:basedOn rdf:type owl:ObjectProperty .
+
+
+###  http://hl7.org/fhir/gender
+fhir:gender rdf:type owl:ObjectProperty .
 
 
 ###  http://hl7.org/fhir/subject
@@ -263,6 +278,13 @@ hft:valueString rdf:type owl:DatatypeProperty ;
 #    Classes
 #################################################################
 
+###  http://example.org/hl7-fhir/AdministrativeGenderCode
+hft:AdministrativeGenderCode rdf:type owl:Class ;
+                             rdfs:subClassOf fhir:code ;
+                             rdfs:comment "A coded cconcept representing the administrative gender of a patient. This code is used for clinical, operational, and reporting purpposes and may not correspond to gender idenity.  Permitted values are male, female, other, and unknown." ;
+                             rdfs:label "Administrative gender code" .
+
+
 ###  http://example.org/hl7-fhir/Condition
 hft:Condition rdf:type owl:Class ;
               rdfs:subClassOf fhir:Condition ;
@@ -336,8 +358,46 @@ fhir:Patient rdf:type owl:Class .
 fhir:ServiceRequest rdf:type owl:Class .
 
 
+###  http://hl7.org/fhir/code
+fhir:code rdf:type owl:Class .
+
+
 ###  http://www.w3.org/2000/01/rdf-schema#Resource
 rdfs:Resource rdf:type owl:Class .
+
+
+#################################################################
+#    Individuals
+#################################################################
+
+###  http://example.org/hl7-fhir/female
+hft:female rdf:type owl:NamedIndividual ,
+                    hft:AdministrativeGenderCode ;
+           rdfs:comment "Indicates that the patient is recorded as female for administrative or clinical purposes." ;
+           rdfs:label "female" .
+
+
+###  http://example.org/hl7-fhir/male
+hft:male rdf:type owl:NamedIndividual ,
+                  hft:AdministrativeGenderCode ;
+         rdfs:comment "Indicates that the patient is recorded as male for administrative or clinical purposes." ;
+         rdfs:label "male" .
+
+
+###  http://example.org/hl7-fhir/other
+hft:other rdf:type owl:NamedIndividual ,
+                   hft:AdministrativeGenderCode ;
+          rdfs:comment "Indicates that the patient is recorded with a gender other than male or female for administrative or clinical purposes" ;
+          rdfs:label "other gender" .
+
+
+###  http://example.org/hl7-fhir/unknown
+hft:unknown rdf:type owl:NamedIndividual ,
+                     hft:AdministrativeGenderCode ;
+            rdfs:comment "Indicates that the patient's administrative gender is not known or has not been recorded." ;
+            rdfs:label "unknown gender" .
+
+
 
 
 #################################################################

@@ -21,7 +21,7 @@ hft:ObservationSubjectAndCodeShape
     sh:path hft:hasCode ;
     sh:minCount 1 ; sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
-    sh:hasValue loinc:4548-4 ;
+    sh:in (loinc:4548-4 loinc:2345-7 loinc:2951-2) ;
     sh:message "Observation must have HbA1c code: hft:hasCode loinc:4548-4." ;
     sh:severity sh:Violation
   ] ;

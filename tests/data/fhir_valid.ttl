@@ -1,29 +1,82 @@
-# tests/data/fhir_valid.ttl
+# tests/data/hft_valid.ttl
 
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
-@prefix fhir:  <http://hl7.org/fhir/> .
-@prefix ex:    <http://example.org/fhir/> .
+@prefix loinc: <http://loinc.org/> .
+@prefix hft:   <http://example.org/hl7-fhir/> .
+@prefix inst:  <http://example.org/hl7-fhir/instances/> .
 
-ex:P1 a fhir:Patient ;
-    rdfs:label "John Doe" ;
-    fhir:identifier "AA1" ;
-    fhir:gender "male" ;
-    fhir:birthDate "1970-01-01"^^xsd:date .
+##### Patients
+inst:P1 a hft:Patient ;
+    rdfs:label       "John Doe" ;
+    hft:identifier   "AA1" ;
+    hft:birthDate    "1970-01-01"^^xsd:date ;
+    hft:gender       hft:male ;
+    hft:given        "John" ;
+    hft:family       "Doe" .
 
-ex:E1 a fhir:Encounter ;
-    fhir:subject ex:P1 ;
-    fhir:status "finished" .
+inst:P2 a hft:Patient ;
+    rdfs:label       "Jane Smith" ;
+    hft:identifier   "BB2" ;
+    hft:birthDate    "1985-05-05"^^xsd:date ;
+    hft:gender       hft:female ;
+    hft:given        "Jane" ;
+    hft:family       "Smith" .
 
-ex:SR1 a fhir:ServiceRequest ;
-    fhir:subject ex:P1 ;
-    fhir:code "GLU" ;
-    fhir:status "active" ;
-    fhir:intent "order" .
+##### Encounters
+inst:E1 a hft:Encounter ;
+    hft:encounterSubject inst:P1 ;
+    hft:status           "finished" .
 
-ex:O1 a fhir:Observation ;
-    fhir:subject ex:P1 ;
-    fhir:code "GLU" ;
-    fhir:value "95"^^xsd:decimal ;
-    fhir:effectiveDateTime "2025-01-01T12:00:00"^^xsd:dateTime .
+inst:E2 a hft:Encounter ;
+    hft:encounterSubject inst:P2 ;
+    hft:status           "in-progress" .
+
+##### ServiceRequests (glucose for both patients, using LOINC 2345-7)
+inst:SR1 a hft:ServiceRequest ;
+    hft:serviceRequestSubject inst:P1 ;
+    hft:intent                "order" ;
+    hft:status                "active" ;
+    hft:hasCode               loinc:2345-7  .
+
+inst:SR2 a hft:ServiceRequest ;
+    hft:serviceRequestSubject inst:P2 ;
+    hft:intent                "order" ;
+    hft:status                "active" ;
+    hft:hasCode               loinc:2345-7 .
+
+##### Observations
+# P1 glucose (LOINC 2345-7)
+inst:O1 a hft:Observation ;
+    hft:observationSubject inst:P1 ;
+    hft:status             "final" ;
+    hft:hasCode            loinc:2345-7 ;
+    hft:valueDecimal       "95"^^xsd:decimal ;
+    hft:hasUnit            "mg/dL" ;
+    hft:effectiveDateTime  "2025-01-01T12:00:00"^^xsd:dateTime .
+
+# P1 sodium (LOINC 2951-2) -- included so shapes run across multiple codes
+inst:O2 a hft:Observation ;
+    hft:observationSubject inst:P1 ;
+    hft:status             "final" ;
+    hft:hasCode            loinc:2951-2 ;
+    hft:valueDecimal       "140"^^xsd:decimal ;
+    hft:hasUnit            "mmol/L" ;
+    hft:effectiveDateTime  "2025-01-01T12:05:00"^^xsd:dateTime .
+
+# P2 glucose (LOINC 2345-7)
+inst:O3 a hft:Observation ;
+    hft:observationSubject inst:P2 ;
+    hft:status             "final" ;
+    hft:hasCode            loinc:2345-7 ;
+    hft:valueDecimal       "102"^^xsd:decimal ;
+    hft:hasUnit            "mg/dL" ;
+    hft:effectiveDateTime  "2025-01-02T09:15:00"^^xsd:dateTime .
+
+##### DiagnosticReport tying P1 together
+inst:DR1 a hft:DiagnosticReport ;
+    hft:diagnosticReportSubject inst:P1 ;
+    hft:status                  "final" ;
+    hft:basedOn                 inst:SR1 ;
+    hft:hasPart                 inst:O1 , inst:O2 .

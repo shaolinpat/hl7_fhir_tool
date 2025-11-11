@@ -65,3 +65,6 @@ docs/.doctrees/
 docs/site/
 argparse
 sys
+rdf/ontology/catalog-v001.xml
+tmp_report_valid.ttl
+
