@@ -234,3 +234,32 @@ hft:ConditionClosedShape
   ) ;
   sh:message "Condition contains an unexpected property (closed-shape violation)." ;
   sh:severity sh:Violation .
+
+
+################################################################################
+# Core Class Disjointness Validation
+# Mirrors owl:AllDisjointClasses axioms to ensure mutual exclusivity between:
+# hft:Condition, hft:DiagnosticReport, hft:Encounter, hft:Observation, 
+# hft:Patient, and hft:ServiceRequest.
+################################################################################
+
+hft:CoreDisjointnessClassesShape
+  a sh:NodeShape ;
+  sh:targetSubjectsOf rdf:type ;
+  sh:sparql [
+    sh:message "An individual is typed as more than one class from the mutually disjoint core set." ;
+    sh:severity sh:Violation ;
+    sh:select """
+      PREFIX hft: <http://example.org/hl7-fhir/>
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      SELECT ?this
+      WHERE {
+        ?this rdf:type ?c1; rdf:type ?c2 .
+        FILTER (?c1 != ?c2)
+        FILTER (?c1 IN (hft:Condition, hft:DiagnosticReport, hft:Encounter,
+                        hft:Observation, hft:Patient, hft:ServiceRequest))
+        FILTER (?c2 IN (hft:Condition, hft:DiagnosticReport, hft:Encounter,
+                        hft:Observation, hft:Patient, hft:ServiceRequest))
+      }
+    """
+  ] .

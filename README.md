@@ -544,16 +544,181 @@ Shapes are organized under `rdf/shapes/`:
 | `data_checks/` | Instance-level data rules (subjects, values, units, relationships) |
 | `schema_checks/` | Ontology-aligned schema-level rules |
 
-Run SHACL validation via **pySHACL**:
+Run SHACL validation via **pySHACL** on **one** data file:
 
 ```bash
-python tools/run_shacl.py   --data rdf/instances/cohort_diabetes_e11_9_hb1ac_over_8.ttl   --shapes rdf/shapes/data_checks/*.ttl rdf/shapes/schema_checks/*.ttl   --inference rdfs   --report-out outputs/shacl_report.ttl
+    python tools/run_shacl.py \
+        --data \
+            tests/data/fhir_valid.ttl \
+        --shapes \
+            src/hl7_fhir_tool/shacl/modules/*.ttl \
+            rdf/shapes/data_checks/*.ttl \
+            rdf/shapes/schema_checks/*.ttl
+```
+
+Expected output:
+```
+--- SHACL Validation Suite --------------------------------------------
+Inference     : rdfs
+Shapes Loaded : 10
+-----------------------------------------------------------------------
+[  1/1] PASS  tests/data/fhir_valid.ttl
+-----------------------------------------------------------------------
+Files Checked : 1
+Failures      : 0
+Warnings (sum): 0
+Result        : ALL EXPECTATIONS MET
+```
+
+Run SHACL validation via **pySHACL** on **multiple** data where some of them are 
+marked as being expected to violate.  The ones that violate as expected are passes:
+```bash
+    python tools/run_shacl.py \
+        --data \
+            tests/data/*.ttl \
+        --shapes \
+            src/hl7_fhir_tool/shacl/modules/*.ttl \
+            rdf/shapes/data_checks/*.ttl \
+            rdf/shapes/schema_checks/*.ttl \
+        --expected-fail \
+            tests/data/fhir_bad_closed.ttl \
+            tests/data/fhir_bad_values.ttl
+```
+
+Expected output:
+```
+--- SHACL Validation Suite --------------------------------------------
+Inference     : rdfs
+Shapes Loaded : 10
+Expected-Fail : 2
+-----------------------------------------------------------------------
+[  1/3] PASS (expected violations)  tests/data/fhir_bad_closed.ttl
+      Details : Violations=1
+[  2/3] PASS (expected violations)  tests/data/fhir_bad_values.ttl
+      Details : Violations=2
+[  3/3] PASS  tests/data/fhir_valid.ttl
+-----------------------------------------------------------------------
+Files Checked : 3
+Failures      : 0
+Warnings (sum): 0
+Result        : ALL EXPECTATIONS MET
+```
+
+A run on the same shapes and data **without** `--expected fail` produces failures:
+```bash
+    python tools/run_shacl.py \
+        --data \
+            tests/data/*.ttl \
+        --shapes \
+            src/hl7_fhir_tool/shacl/modules/*.ttl \
+            rdf/shapes/data_checks/*.ttl \
+            rdf/shapes/schema_checks/*.ttl
+```
+
+Expected output:
+```
+--- SHACL Validation Suite --------------------------------------------
+Inference     : rdfs
+Shapes Loaded : 10
+-----------------------------------------------------------------------
+[  1/3] FAIL  tests/data/fhir_bad_closed.ttl
+      Details : Violations=1
+[  2/3] FAIL  tests/data/fhir_bad_values.ttl
+      Details : Violations=2
+[  3/3] PASS  tests/data/fhir_valid.ttl
+-----------------------------------------------------------------------
+Files Checked : 3
+Failures      : 2
+Warnings (sum): 0
+Result        : EXPECTATIONS NOT MET
+```
+
+Include `--details fail` or `--details all` to get more verbose output:
+```bash
+    python tools/run_shacl.py \
+        --data \
+            tests/data/*.ttl \
+        --shapes \
+            src/hl7_fhir_tool/shacl/modules/*.ttl \
+            rdf/shapes/data_checks/*.ttl \
+            rdf/shapes/schema_checks/*.ttl \
+        --expected-fail \
+            tests/data/fhir_bad_closed.ttl \
+            tests/data/fhir_bad_values.ttl \
+        --details all
+```
+
+Expected output:
+```
+--- SHACL Validation Suite --------------------------------------------
+Inference     : rdfs
+Shapes Loaded : 10
+Expected-Fail : 2
+-----------------------------------------------------------------------
+[  1/3] PASS (expected violations)  tests/data/fhir_bad_closed.ttl
+      Details : Violations=1
+      ----- Validation Report (pySHACL) -----
+Validation Report
+Conforms: False
+Results (1):
+Constraint Violation in ClosedConstraintComponent (http://www.w3.org/ns/shacl#ClosedConstraintComponent):
+        Severity: sh:Violation
+        Source Shape: <http://example.org/hl7-fhir/PatientClosedShape>
+        Focus Node: ex:P2
+        Value Node: Literal("oops")
+        Result Path: <http://hl7.org/fhir/unknownProp>
+        Message: Patient contains an unexpected property (closed-shape violation).
+
+      ---------------------------------------
+      Total Results : 1
+      Data File     : tests/data/fhir_bad_closed.ttl
+      Inference     : rdfs
+
+[  2/3] PASS (expected violations)  tests/data/fhir_bad_values.ttl
+      Details : Violations=2
+      ----- Validation Report (pySHACL) -----
+Validation Report
+Conforms: False
+Results (2):
+Constraint Violation in MinCountConstraintComponent (http://www.w3.org/ns/shacl#MinCountConstraintComponent):
+        Severity: sh:Violation
+        Source Shape: [ sh:message Literal("Encounter must reference a Patient (encounterSubject/subject).") ; sh:minCount Literal("1", datatype=xsd:integer) ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir/encounterSubject> <http://hl7.org/fhir/subject> ) ] ; sh:severity sh:Violation ]
+        Focus Node: ex:E2
+        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir/encounterSubject> <http://hl7.org/fhir/subject> ) ]
+        Message: Encounter must reference a Patient (encounterSubject/subject).
+Constraint Violation in InConstraintComponent (http://www.w3.org/ns/shacl#InConstraintComponent):
+        Severity: sh:Violation
+        Source Shape: [ sh:in ( Literal("registered") Literal("preliminary") Literal("final") Literal("amended") Literal("partial") Literal("draft") Literal("active") Literal("completed") Literal("revoked") ) ; sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir/status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
+        Focus Node: ex:SR2
+        Value Node: Literal("bogus")
+        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir/status> <http://hl7.org/fhir/status> ) ]
+        Message: Status must be a permitted value for this resource.
+
+      ---------------------------------------
+      Total Results : 2
+      Data File     : tests/data/fhir_bad_values.ttl
+      Inference     : rdfs
+
+[  3/3] PASS  tests/data/fhir_valid.ttl
+      ----- Validation Report (pySHACL) -----
+Validation Report
+Conforms: True
+
+      ---------------------------------------
+      Total Results : 0
+      Data File     : tests/data/fhir_valid.ttl
+      Inference     : rdfs
+
+-----------------------------------------------------------------------
+Files Checked : 3
+Failures      : 0
+Warnings (sum): 0
+Result        : ALL EXPECTATIONS MET
 ```
 
 **Interpreting results:**
-- `Conforms: True` → all shapes satisfied.  
-- Warnings (e.g., HbA1c > 8.0) flag analytic exceptions but don’t fail validation.  
-- Change `sh:severity sh:Warning` to `sh:severity sh:Violation` to make failures non-conforming.
+- `ALL EXPECTATIONS MET` -> all shapes satisfied.
+- `EXPECTATIONS NOT MET` -> not all shapes satisfied. 
 
 ---
 
