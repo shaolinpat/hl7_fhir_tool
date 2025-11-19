@@ -68,3 +68,9 @@ sys
 rdf/ontology/catalog-v001.xml
 tmp_report_valid.ttl
 
+
+images/hl7_fhir_flow.txt
+tests/data/bulk_a01/
+tests/data/hl7_stream/
+tests/data/bulk_mixed_300/
+

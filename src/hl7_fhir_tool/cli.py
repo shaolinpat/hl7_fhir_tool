@@ -607,7 +607,7 @@ def _cmd_transform(
         For invalid input, missing transformer, or unwritable output.
     """
     if list_only:
-        print("Registered HL7 v2 → FHIR events:")
+        print("Registered HL7 v2 -> FHIR events:")
         for evt in sorted(available_events()):
             print(f"    {evt}")
         return EXIT_OK
