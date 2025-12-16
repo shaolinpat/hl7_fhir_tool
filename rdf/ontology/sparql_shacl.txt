@@ -1,0 +1,97 @@
+# SPARQL
+
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX hft: <http://example.org/hl7-fhir-tool#>
+PREFIX fhir: <http://hl7.org/fhir/> 
+SELECT ?s ?p
+WHERE { ?s a hft:Patient .
+	?s ?p ?o .
+FILTER (?p != rdf:type) }
+
+
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX hft:  <http://example.org/hl7-fhir-tool#>
+PREFIX fhir: <http://hl7.org/fhir/>
+
+SELECT ?patient ?id ?gender ?birthDate
+WHERE {
+  ?patient rdf:type hft:Patient .
+  OPTIONAL { ?patient fhir:id ?id . }
+  OPTIONAL { ?patient fhir:gender ?gender . }
+  OPTIONAL { ?patient fhir:birthDate ?birthDate . }
+}
+ORDER BY ?patient
+
+
+# SHACL
+
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix fhir: <http://hl7.org/fhir/> .
+
+hft:DemoGenderExactly3ForOnePatientShape
+  a sh:NodeShape ;
+  sh:targetNode hft:pat-451994 ;
+  sh:property [
+    sh:path fhir:gender ;
+    sh:minCount 3 ;
+    sh:maxCount 3 ;
+    sh:message "DEMO: hft:pat-451994 must have exactly 3 fhir:gender values (min=3, max=3)." ;
+  ] .
+
+
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+
+hft:ObsMustHaveExactlyOneIdentifier_SPARQL
+  a sh:NodeShape ;
+  sh:targetNode hft:obs-451994-1 ;
+
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "Observation must have exactly 1 fhir:identifier (this one has != 1)." ;
+    sh:select """
+      PREFIX fhir: <http://hl7.org/fhir/>
+      SELECT ?this
+      WHERE {
+        {
+          SELECT ?this (COUNT(?idnode) AS ?n)
+          WHERE {
+            ?this fhir:identifier ?idnode .
+          }
+          GROUP BY ?this
+        }
+        FILTER ( ?n != 1 )
+      }
+    """ ;
+  ] .
+
+
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+
+hft:ObservationsWithMultipleIdentifiers_SPARQL
+  a sh:NodeShape ;
+  sh:targetClass hft:Observation ;
+
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "Observation has more than 1 fhir:identifier node." ;
+    sh:select """
+      PREFIX fhir: <http://hl7.org/fhir/>
+      SELECT ?this
+      WHERE {
+        {
+          SELECT ?this (COUNT(?idnode) AS ?n)
+          WHERE { ?this fhir:identifier ?idnode . }
+          GROUP BY ?this
+          HAVING (COUNT(?idnode) > 1)
+        }
+      }
+    """ ;
+  ] .
+
+

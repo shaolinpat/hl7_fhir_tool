@@ -397,7 +397,7 @@ class ORUR01Transformer:
             except Exception:
                 pass
         if not obx_segs:
-            # Handle nested ORU_R01 structure (PATIENT_RESULT → ORDER_OBSERVATION → OBX)
+            # Handle nested ORU_R01 structure (PATIENT_RESULT -> ORDER_OBSERVATION -> OBX)
             try:
                 pr = getattr(msg, "PATIENT_RESULT", None)
                 if _is_truthy_container(pr):

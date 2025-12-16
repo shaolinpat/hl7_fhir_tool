@@ -1,0 +1,13 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix fhir: <http://hl7.org/fhir/> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+
+hft:AnythingWithSubjectMustHaveTwoShape
+  a sh:NodeShape ;
+  sh:targetSubjectsOf fhir:subject ;
+  sh:property [
+    sh:path fhir:subject ;
+    sh:minCount 2 ;
+    sh:maxCount 2 ;
+    sh:message "Any node with fhir:subject must have exactly 2 fhir:subject values (illustration constraint)." ;
+  ] .

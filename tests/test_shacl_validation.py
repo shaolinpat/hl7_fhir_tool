@@ -9,12 +9,9 @@ import pytest
 import subprocess
 import sys
 
-from pathlib import Path
-from rdflib import Graph
 from pyshacl import validate
-from rdflib import URIRef
 
-from rdflib import Graph, URIRef, Namespace
+from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
 # ------------------------------------------------------------------------------

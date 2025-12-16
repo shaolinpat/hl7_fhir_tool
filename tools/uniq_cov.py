@@ -180,7 +180,7 @@ def print_line_centric(file_key: str, meta: dict, width: int, limit: int) -> Non
 
     if not line_to_ctx:
         print(
-            "No contextual line data found (per-line). File may be fully covered but without line→test attributions."
+            "No contextual line data found (per-line). File may be fully covered but without line ->test attributions."
         )
         return
 
