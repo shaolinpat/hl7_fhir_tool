@@ -12,6 +12,7 @@ dependencies:
       # Core RDF/SHACL dependencies
       - rdflib>=7.0.0
       - pyshacl>=0.25.0
+      - pyparsing>=3.2,<3.2
       
       # Development/test dependencies
       - pytest>=8.2
@@ -19,3 +20,4 @@ dependencies:
       - mypy>=1.11
       - ruff>=0.6.0
       - types-PyYAML
+      
