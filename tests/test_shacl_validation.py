@@ -40,7 +40,7 @@ PY = sys.executable
 
 
 def _validate(data_rel, shapes=SHAPES):
-    data = os.path.join(BASE, "data", data_rel)
+    data = os.path.join(ROOT, "tests", "data", data_rel)
     dg = Graph().parse(data, format="turtle")
 
     # --------------------------------------------------------------------------
@@ -57,7 +57,11 @@ def _validate(data_rel, shapes=SHAPES):
 
     print("---- DEBUG: triples containing AdministrativeGenderCode ----")
     for s, p, o in dg.triples(
-        (None, RDF.type, URIRef("http://example.org/hl7-fhir/AdministrativeGenderCode"))
+        (
+            None,
+            RDF.type,
+            URIRef("http://example.org/hl7-fhir-tool#AdministrativeGenderCode"),
+        )
     ):
         print(s, "is a AdministrativeGenderCode")
     print("---- DEBUG: total triples in data graph:", len(dg))

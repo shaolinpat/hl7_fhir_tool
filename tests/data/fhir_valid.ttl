@@ -4,7 +4,7 @@
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
 @prefix loinc: <http://loinc.org/> .
-@prefix hft:   <http://example.org/hl7-fhir/> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
 @prefix inst:  <http://example.org/hl7-fhir/instances/> .
 
 ##### Patients

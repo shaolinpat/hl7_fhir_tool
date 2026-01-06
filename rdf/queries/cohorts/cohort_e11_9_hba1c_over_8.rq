@@ -1,4 +1,4 @@
-PREFIX hft:   <http://example.org/hl7-fhir/>
+PREFIX hft:   <http://example.org/hl7-fhir-tool#>
 PREFIX loinc: <http://loinc.org/>
 PREFIX icd10: <http://hl7.org/fhir/sid/icd-10-cm/>
 PREFIX xsd:   <http://www.w3.org/2001/XMLSchema#>

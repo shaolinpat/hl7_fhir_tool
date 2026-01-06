@@ -1,6 +1,6 @@
 @prefix sh:     <http://www.w3.org/ns/shacl#> .
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
-@prefix hft:    <http://example.org/hl7-fhir/> .
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
 @prefix loinc:  <http://loinc.org/> .
 
 # core numeric constraints for HbA1c observations
@@ -29,7 +29,7 @@ hft:ObservationA1cThresholdShape
   sh:target [
     a sh:SPARQLTarget ;
     sh:select """
-      PREFIX hft:   <http://example.org/hl7-fhir/>
+      PREFIX hft:   <http://example.org/hl7-fhir-tool#>
       PREFIX loinc: <http://loinc.org/>
       SELECT ?this WHERE {
         ?this a hft:Observation ; hft:hasCode loinc:4548-4 .

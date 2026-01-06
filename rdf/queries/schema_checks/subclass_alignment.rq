@@ -1,4 +1,4 @@
-PREFIX hft:  <http://example.org/hl7-fhir/>
+PREFIX hft:  <http://example.org/hl7-fhir-tool#>
 PREFIX fhir: <http://hl7.org/fhir/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 

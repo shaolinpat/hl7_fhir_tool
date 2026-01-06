@@ -693,7 +693,7 @@ Conforms: False
 Results (1):
 Constraint Violation in ClosedConstraintComponent (http://www.w3.org/ns/shacl#ClosedConstraintComponent):
         Severity: sh:Violation
-        Source Shape: <http://example.org/hl7-fhir/PatientClosedShape>
+        Source Shape: <http://example.org/hl7-fhir-tool#PatientClosedShape>
         Focus Node: ex:P2
         Value Node: Literal("oops")
         Result Path: <http://hl7.org/fhir/unknownProp>
@@ -712,16 +712,16 @@ Conforms: False
 Results (2):
 Constraint Violation in MinCountConstraintComponent (http://www.w3.org/ns/shacl#MinCountConstraintComponent):
         Severity: sh:Violation
-        Source Shape: [ sh:message Literal("Encounter must reference a Patient (encounterSubject/subject).") ; sh:minCount Literal("1", datatype=xsd:integer) ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir/encounterSubject> <http://hl7.org/fhir/subject> ) ] ; sh:severity sh:Violation ]
+        Source Shape: [ sh:message Literal("Encounter must reference a Patient (encounterSubject/subject).") ; sh:minCount Literal("1", datatype=xsd:integer) ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#encounterSubject> <http://hl7.org/fhir/subject> ) ] ; sh:severity sh:Violation ]
         Focus Node: ex:E2
-        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir/encounterSubject> <http://hl7.org/fhir/subject> ) ]
+        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#encounterSubject> <http://hl7.org/fhir/subject> ) ]
         Message: Encounter must reference a Patient (encounterSubject/subject).
 Constraint Violation in InConstraintComponent (http://www.w3.org/ns/shacl#InConstraintComponent):
         Severity: sh:Violation
-        Source Shape: [ sh:in ( Literal("registered") Literal("preliminary") Literal("final") Literal("amended") Literal("partial") Literal("draft") Literal("active") Literal("completed") Literal("revoked") ) ; sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir/status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
+        Source Shape: [ sh:in ( Literal("registered") Literal("preliminary") Literal("final") Literal("amended") Literal("partial") Literal("draft") Literal("active") Literal("completed") Literal("revoked") ) ; sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
         Focus Node: ex:SR2
         Value Node: Literal("bogus")
-        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir/status> <http://hl7.org/fhir/status> ) ]
+        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ]
         Message: Status must be a permitted value for this resource.
 
       ---------------------------------------
