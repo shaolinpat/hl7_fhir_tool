@@ -1,7 +1,7 @@
 # HL7 -> FHIR Tool
 
-[![CI](https://github.com/shaolinpat/ecg_cnn_pytorch/actions/workflows/ci.yml/badge.svg)](https://github.com/shaolinpat/hl7_fhir_tool/actions/workflows/ci.yml)
-[![Coverage (flag)](https://img.shields.io/codecov/c/github/shaolinpat/ecg_cnn_pytorch.svg?flag=hl7_fhir_tool&branch=main)](https://codecov.io/gh/shaolinpat/hl7_fhir_tool)  
+[![CI](https://github.com/shaolinpat/hl7_fhir_tool/actions/workflows/ci.yml/badge.svg)](https://github.com/shaolinpat/hl7_fhir_tool/actions/workflows/ci.yml)
+[![Coverage (flag)](https://img.shields.io/codecov/c/github/shaolinpat/hl7_fhir_tool.svg?flag=hl7_fhir_tool&branch=main)](https://codecov.io/gh/shaolinpat/hl7_fhir_tool)  
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -31,7 +31,7 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
 - [Continuous Integration](#continuous-integration)
 - [Status](#status)
 
-- [Ontology](#ontology)
+- [Ontology Model](#ontology-model)
 - [SPARQL Testing](#sparql-testing)
 - [SHACL Testing](#shacl-testing)
 
@@ -516,7 +516,7 @@ This tool is intended as a portfolio-quality demonstration of interoperability s
 
 ---
 
-## Ontology
+## Ontology Model
 
 The **ontology** defines the RDF model that underpins HL7 -> FHIR transformations.  
 It lives in `rdf/ontology/hl7_fhir_tool_schema.ttl` and includes:

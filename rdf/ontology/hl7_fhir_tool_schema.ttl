@@ -9,7 +9,7 @@
 @base <http://example.org/hl7-fhir-tool#> .
 
 <http://example.org/hl7-fhir-tool#> rdf:type owl:Ontology ;
-                                     owl:imports <file:/home/pbeach/Dropbox/VT-MIT/Projects/hl7_fhir_tool/outputs/fhir/fhir_evetns.ttl> .
+                                     owl:imports <file:/home/pbeach/Dropbox/VT-MIT/Projects/hl7_fhir_tool/outputs/fhir/fhir_events.ttl> .
 
 #################################################################
 #    Datatypes

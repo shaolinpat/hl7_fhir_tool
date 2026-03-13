@@ -59,6 +59,7 @@ workspace/
 
 # Generated or local output
 outputs/
+out/
 docs/
 docs/_build/
 docs/.doctrees/

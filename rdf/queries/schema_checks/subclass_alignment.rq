@@ -2,6 +2,14 @@ PREFIX hft:  <http://example.org/hl7-fhir-tool#>
 PREFIX fhir: <http://hl7.org/fhir/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
+# Checks that every hft: class declares rdfs:subClassOf its canonical fhir: counterpart.
+#
+# This alignment is what makes hft: an *extension* of FHIR rather than a
+# parallel vocabulary. Without it, queries and reasoners operating on fhir:
+# terms won't pick up hft: individuals, breaking cross-namespace interoperability.
+#
+# Expected result: no rows (all alignments present).
+
 SELECT ?hft ?expected WHERE {
   VALUES (?hft ?expected) {
     (hft:Patient fhir:Patient)
