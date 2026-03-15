@@ -1,0 +1,56 @@
+@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+hft:Patient_p1001 a hft:Patient ;
+    hft:identifier "MRN-1001"^^xsd:string ;
+    hft:family "Smith"^^xsd:string ;
+    hft:given "Alice"^^xsd:string ;
+    hft:birthDate "1965-03-22"^^xsd:date ;
+    hft:gender hft:female .
+
+hft:Condition_cond-1001 a hft:Condition ;
+    hft:conditionSubject hft:Patient_p1001 ;
+    hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
+
+hft:Observation_obs-1001 a hft:NumericObservation ;
+    hft:observationSubject hft:Patient_p1001 ;
+    hft:hasCode <http://loinc.org/4548-4> ;
+    hft:valueDecimal 8.6 ;
+    hft:hasUnit "%" ;
+    hft:status "final"^^xsd:string .
+
+hft:Patient_p1002 a hft:Patient ;
+    hft:identifier "MRN-1002"^^xsd:string ;
+    hft:family "Jones"^^xsd:string ;
+    hft:given "Robert"^^xsd:string ;
+    hft:birthDate "1958-11-04"^^xsd:date ;
+    hft:gender hft:male .
+
+hft:Condition_cond-1002 a hft:Condition ;
+    hft:conditionSubject hft:Patient_p1002 ;
+    hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
+
+hft:Observation_obs-1002 a hft:NumericObservation ;
+    hft:observationSubject hft:Patient_p1002 ;
+    hft:hasCode <http://loinc.org/4548-4> ;
+    hft:valueDecimal 9.1 ;
+    hft:hasUnit "%" ;
+    hft:status "final"^^xsd:string .
+
+hft:Patient_p1003 a hft:Patient ;
+    hft:identifier "MRN-1003"^^xsd:string ;
+    hft:family "Garcia"^^xsd:string ;
+    hft:given "Maria"^^xsd:string ;
+    hft:birthDate "1972-07-15"^^xsd:date ;
+    hft:gender hft:female .
+
+hft:Condition_cond-1003 a hft:Condition ;
+    hft:conditionSubject hft:Patient_p1003 ;
+    hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
+
+hft:Observation_obs-1003 a hft:NumericObservation ;
+    hft:observationSubject hft:Patient_p1003 ;
+    hft:hasCode <http://loinc.org/4548-4> ;
+    hft:valueDecimal 7.4 ;
+    hft:hasUnit "%" ;
+    hft:status "final"^^xsd:string .

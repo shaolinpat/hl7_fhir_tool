@@ -157,9 +157,9 @@ def test_ensure_resource_type_attr_no_expected_does_nothing():
     assert getattr(inst, "resource_type") == ""
 
 
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # _xml_to_obj_promotes_to_list()
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def test_xml_to_obj_promotes_to_list():
@@ -250,67 +250,6 @@ def test_construct_base_no_apis_error_xml(tmp_path, monkeypatch):
         "expose model_construct or construct",
     ):
         load_fhir_xml(p)
-
-
-# def test_construct_base_descriptor_success_xml(tmp_path, monkeypatch):
-#     """Cover the descriptor-binding path."""
-#     # Force _construct_base to skip v2/v1 on Resource
-#     monkeypatch.setattr(Resource, "model_construct", None, raising=False)
-#     monkeypatch.setattr(Resource, "construct", None, raising=False)
-
-#     # Provide a BaseModel.model_construct that *does* have __get__ and works
-#     orig_bm_mc = BaseModel.model_construct
-
-#     class HasGet:
-#         def __get__(self, _owner, _type):
-#             return orig_bm_mc  # return the original (bound) callable
-
-#     monkeypatch.setattr(BaseModel, "model_construct", HasGet(), raising=False)
-
-#     xml = (
-#         '<CustomResource xmlns="http://hl7.org/fhir">'
-#         '<id value="z"/><identifier value="a"/><identifier value="b"/></CustomResource>'
-#     )
-#     p = tmp_path / "custom_desc.xml"
-#     p.write_text(xml, encoding="utf-8")
-
-#     res = load_fhir_xml(p)
-#     # resource_type assigned + list promotion (hits list-aggregation branch)
-#     assert getattr(res, "resource_type", None) == "CustomResource"
-#     # Ensure identifiers were aggregated into a list via _xml_to_obj branch
-#     ids = getattr(res, "identifier", None)
-#     assert isinstance(ids, list) and ids == ["a", "b"]
-
-
-# def test_construct_base_unbound_func_raises_xml(tmp_path, monkeypatch):
-#     """
-#     Cover the __func__ path and ensure the inner exception bubbles as 'explode',
-#     matching the test that expects that exact message.
-#     """
-#     # Disable Resource v2/v1 APIs
-#     monkeypatch.setattr(Resource, "model_construct", None, raising=False)
-#     monkeypatch.setattr(Resource, "construct", None, raising=False)
-
-#     class Boom:
-#         def __call__(self, *a, **k):
-#             raise RuntimeError("explode")
-
-#     # Provide an object with __func__ that raises
-#     monkeypatch.setattr(
-#         BaseModel,
-#         "model_construct",
-#         type("X", (), {"__func__": Boom()})(),
-#         raising=False,
-#     )
-
-#     xml = '<CustomResource xmlns="http://hl7.org/fhir"><id value="z"/></CustomResource>'
-#     p = tmp_path / "custom_basefail.xml"
-#     p.write_text(xml, encoding="utf-8")
-
-#     with pytest.raises(
-#         ParseError, match=r"^failed to construct base Resource from XML: explode$"
-#     ):
-#         load_fhir_xml(p)
 
 
 # ------------------------------------------------------------------------------

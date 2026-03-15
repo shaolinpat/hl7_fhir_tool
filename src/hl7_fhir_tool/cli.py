@@ -53,13 +53,14 @@ from .exceptions import HL7FHIRToolError
 from .fhir_parser import load_fhir_json, load_fhir_xml
 from .hl7_parser import parse_hl7_v2, to_pretty_segments
 from .logging_utils import configure_logging
+from .rdf_serializer import serialize_resources
 from .transform.registry import available_events, get_transformer
 
 # import hl7_fhir_tool.transform
 
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 # globals
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 
 LOG = logging.getLogger("hl7_fhir_tool")
 
@@ -67,9 +68,9 @@ EXIT_OK = 0
 EXIT_ERR = 1
 EXIT_CLI = 2
 
-# ------------------------------------------------------------------------------
-# Parser construction
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+# parser construction
+# -------------------------------------------------------------------------------
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -160,12 +161,31 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Pretty-print JSON output (for stdout or files).",
     )
 
+    s4 = sub.add_parser(
+        "to-rdf", help="Transform HL7 v2 to FHIR and serialize to RDF/Turtle."
+    )
+    s4.add_argument(
+        "path", type=Path, help='Path to HL7 v2 message file. Use "-" for stdin.'
+    )
+    s4.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory to write .ttl output.",
+    )
+    s4.add_argument(
+        "--stdout",
+        action="store_true",
+        help="Write Turtle to stdout instead of to a file.",
+    )
+
     return parser
 
 
-# ------------------------------------------------------------------------------
-# Validation helpers
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+# validation helpers
+# -------------------------------------------------------------------------------
 
 
 def _validate_existing_file(path: Path, allow_stdin: bool = False) -> None:
@@ -297,7 +317,7 @@ def _read_text_input(path: Path) -> str:
 
 
 # ------------------------------------------------------------------------------
-# JSON helpers
+# json helpers
 # ------------------------------------------------------------------------------
 
 
@@ -332,7 +352,9 @@ def _resource_to_json_str(resource: Any, pretty: bool) -> str:
     """
     indent = 2 if pretty else None
 
-    # ---- Pydantic v2 (preferred) ---------------------------------------------
+    # --------------------------------------------------------------------------
+    # pydantic v2 (preferred)
+    # --------------------------------------------------------------------------
     try:
         mdj = getattr(resource, "model_dump_json", None)
         if callable(mdj):
@@ -347,7 +369,9 @@ def _resource_to_json_str(resource: Any, pretty: bool) -> str:
     except Exception:
         pass
 
-    # ---- Pydantic v1 (avoid deprecated .json()) ------------------------------
+    # --------------------------------------------------------------------------
+    # pydantic v1 (avoid deprecated .json())
+    # --------------------------------------------------------------------------
     try:
         dmethod = getattr(resource, "dict", None)
         if callable(dmethod):
@@ -355,7 +379,9 @@ def _resource_to_json_str(resource: Any, pretty: bool) -> str:
     except Exception:
         pass
 
-    # ---- Generic fallback ----------------------------------------------------
+    # --------------------------------------------------------------------------
+    # generic fallback
+    # --------------------------------------------------------------------------
     def _to_jsonable(obj: Any) -> Any:
         # primitives
         if obj is None or isinstance(obj, (str, int, float, bool)):
@@ -480,9 +506,9 @@ def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
     sys.stdout.flush()
 
 
-# ------------------------------------------------------------------------------
-# HL7 parse helper
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+# hl7 parse helper
+# -------------------------------------------------------------------------------
 
 
 def _parse_hl7_for_cli(content: str) -> Message:
@@ -512,9 +538,9 @@ def _parse_hl7_for_cli(content: str) -> Message:
         return msg
 
 
-# ------------------------------------------------------------------------------
-# Command handlers
-# ------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+# command handlers
+# -------------------------------------------------------------------------------
 
 
 def _cmd_parse_hl7(path: Path) -> int:
@@ -637,9 +663,73 @@ def _cmd_transform(
     return EXIT_OK
 
 
-# ------------------------------------------------------------------------------
-# Entrypoint
-# ------------------------------------------------------------------------------
+def _cmd_to_rdf(
+    path: Path,
+    output_dir: Optional[Path],
+    to_stdout: bool,
+) -> int:
+    """
+    To-rdf: run the full HL7 -> FHIR -> RDF pipeline and emit Turtle output.
+
+    Parameters
+    ----------
+    path : Path
+        Path to HL7 v2 message file, or "-" for stdin.
+    output_dir : Path or None
+        Directory to write the .ttl file when not writing to stdout.
+    to_stdout : bool
+        If True, write Turtle to stdout.
+
+    Returns
+    -------
+    int
+        EXIT_OK on success.
+
+    Raises
+    ------
+    HL7FHIRToolError
+        For invalid input or unwritable output.
+    """
+    _validate_existing_file(path, allow_stdin=True)
+    _validate_output_mode(output_dir, to_stdout)
+
+    content = _read_text_input(path)
+    msg = _parse_hl7_for_cli(content)
+
+    xform = get_transformer(msg)
+    if not xform:
+        raise HL7FHIRToolError("No transformer registered for this HL7 message type.")
+
+    resources = list(xform.transform(msg))
+    graph = serialize_resources(resources)
+    turtle = graph.serialize(format="turtle")
+
+    if to_stdout:
+        sys.stdout.write(turtle)
+        sys.stdout.flush()
+        return EXIT_OK
+
+    cfg = load_config(None)
+    out_dir = output_dir or cfg.default_output_dir
+    _validate_output_mode(out_dir, to_stdout=False)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Derive filename from the source file; fall back to "output"
+    stem = path.stem if str(path) != "-" else "output"
+    out_path = out_dir / f"{stem}.ttl"
+    try:
+        out_path.write_text(turtle, encoding="utf-8")
+    except OSError as e:
+        raise HL7FHIRToolError(f"Failed to write {out_path}: {e}") from e
+
+    LOG.info("Wrote %s  (%d triples)", out_path, len(graph))
+    print(f"Wrote {out_path}  ({len(graph)} triples)")
+    return EXIT_OK
+
+
+# -------------------------------------------------------------------------------
+# main
+# -------------------------------------------------------------------------------
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -679,6 +769,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                 to_stdout=bool(args.stdout),
                 pretty=bool(args.pretty),
             )
+        if args.cmd == "to-rdf":
+            return _cmd_to_rdf(
+                path=args.path, output_dir=args.output_dir, to_stdout=bool(args.stdout)
+            )
+
         parser.error("Unknown command")  # defensive, should not happen
         return EXIT_CLI
 

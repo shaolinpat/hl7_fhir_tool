@@ -20,7 +20,7 @@ from hl7_fhir_tool import cli
 
 
 # ------------------------------------------------------------------------------
-# Helpers
+# helpers
 # ------------------------------------------------------------------------------
 
 HL7_TEXT = (
@@ -38,7 +38,7 @@ def write_hl7(tmp_path: Path, name: str = "msg.hl7", text: str = HL7_TEXT) -> Pa
 
 
 # ------------------------------------------------------------------------------
-# Happy paths
+# happy paths
 # ------------------------------------------------------------------------------
 
 
@@ -526,6 +526,52 @@ def test_cmd_transform_list_prints_and_exits_ok(tmp_path, capsys):
     out, _ = capsys.readouterr()
     assert code == cli.EXIT_OK
     assert "ADT^A01" in out
+
+
+# ------------------------------------------------------------------------------
+# _cmd_to_rdf
+# ------------------------------------------------------------------------------
+
+
+def test_cmd_to_rdf_stdout(tmp_path, capsys):
+    p = write_hl7(tmp_path)
+    code = cli.main(["to-rdf", str(p), "--stdout"])
+    out, _ = capsys.readouterr()
+    assert code == cli.EXIT_OK
+    assert "@prefix hft:" in out
+
+
+def test_cmd_to_rdf_writes_file(tmp_path):
+    p = write_hl7(tmp_path)
+    out_dir = tmp_path / "rdf_out"
+    code = cli.main(["to-rdf", str(p), "-o", str(out_dir)])
+    assert code == cli.EXIT_OK
+    ttl = out_dir / "msg.ttl"
+    assert ttl.exists()
+    assert "@prefix hft:" in ttl.read_text(encoding="utf-8")
+
+
+def test_cmd_to_rdf_no_transformer(tmp_path, monkeypatch):
+    p = write_hl7(tmp_path)
+    monkeypatch.setattr("hl7_fhir_tool.cli.get_transformer", lambda _msg: None)
+    code = cli.main(["to-rdf", str(p), "--stdout"])
+    assert code == cli.EXIT_ERR
+
+
+def test_cmd_to_rdf_write_fails(tmp_path, monkeypatch):
+    p = write_hl7(tmp_path)
+    out_dir = tmp_path / "rdf_out"
+
+    real_write = Path.write_text
+
+    def boom(self, *a, **k):
+        if self.suffix == ".ttl":
+            raise OSError("disk-full")
+        return real_write(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    code = cli.main(["to-rdf", str(p), "-o", str(out_dir)])
+    assert code == cli.EXIT_ERR
 
 
 # ------------------------------------------------------------------------------

@@ -32,7 +32,7 @@ import hl7_fhir_tool.transform.v2_to_fhir.adt_a01 as mod
 _REAL_REGISTRY_MOD = importlib.import_module("hl7_fhir_tool.transform.registry")
 
 # ------------------------------------------------------------------------------
-# Lightweight HL7-like stubs
+# lightweight hl7-like stubs
 # ------------------------------------------------------------------------------
 
 
@@ -89,7 +89,7 @@ class _Msg:
 
 
 # ------------------------------------------------------------------------------
-# Helpers: re-import adt_a01 safely to cover import-time branches
+# helpers: re-import adt_a01 safely to cover import-time branches
 # ------------------------------------------------------------------------------
 
 
@@ -157,7 +157,7 @@ def _reimport_adt_a01_for_import_branch(assign_raises: bool):
 
 
 # ------------------------------------------------------------------------------
-# Normalizers so asserts work with real fhir.resources models
+# normalizers so asserts work with real fhir.resources models
 # ------------------------------------------------------------------------------
 
 
@@ -203,7 +203,7 @@ def _birth_as_str(patient):
 
 
 # ------------------------------------------------------------------------------
-# Small helpers tests
+# helpers tests
 # ------------------------------------------------------------------------------
 
 
@@ -235,7 +235,7 @@ def test_seq_len_safe_simple():
 
 
 # ------------------------------------------------------------------------------
-# PID helpers
+# pid helpers
 # ------------------------------------------------------------------------------
 
 
@@ -427,7 +427,7 @@ def test_transform_encounter_status_setter_raises(monkeypatch):
 
 
 # ------------------------------------------------------------------------------
-# Import-time branch coverage
+# import-time branch coverage
 # ------------------------------------------------------------------------------
 
 
@@ -442,7 +442,7 @@ def test_import_branch_sets_resource_type_raises():
 
 
 # ------------------------------------------------------------------------------
-# Construct fallbacks
+# construct fallbacks
 # ------------------------------------------------------------------------------
 
 

@@ -5,7 +5,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipeline. HL7 v2 messages (ADT, ORM, ORU) are transformed into linked FHIR resources—Patient, Encounter, Condition, ServiceRequest, Observation, DiagnosticReport—with ICD-10 and LOINC code bindings. These FHIR resources are then serialized into RDF/Turtle, forming a coherent graph that supports SHACL-based data quality validation and SPARQL cohort queries. The result is a full proof-of-concept showing how legacy HL7 feeds can be normalized into FHIR and elevated into a semantic data layer suitable for analytics, reasoning, and eventual deployment in a graph database such as GraphDB or Apache Jena.
+This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipeline. HL7 v2 messages (ADT, ORM, ORU) are transformed into linked FHIR resources -- Patient, Encounter, Condition, ServiceRequest, Observation, DiagnosticReport -- with ICD-10 and LOINC code bindings. These FHIR resources are then serialized into RDF/Turtle, forming a coherent graph that supports SHACL-based data quality validation and SPARQL cohort queries. The result is a full proof-of-concept showing how legacy HL7 feeds can be normalized into FHIR and elevated into a semantic data layer suitable for analytics, reasoning, and deployment in a graph database such as GraphDB or Apache Jena.
 
 ---
 
@@ -13,7 +13,7 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
 
 - [Why This Project Matters](#why-this-project-matters)
   - [Why SPARQL and SHACL Belong Here](#why-sparql-and-shacl-belong-here)
-  - [Where Java Fits](#where-java-fits)
+  - [Java Integration Pathways](#java-integration-pathways)
 - [Why LOINC Matters Here](#why-loinc-matters-here)
 - [Why ICD-10 Matters Here](#why-icd-10-matters-here)
 - [HL7 to FHIR Flow Diagram](#hl7-to-fhir-flow-diagram)
@@ -25,16 +25,18 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
   - [Transform HL7 v2 -> FHIR](#transform-hl7-v2--fhir)
     - [ADT^A01 (Admit)](#adta01-admit)
     - [ADT^A03 (Discharge)](#adta03-discharge)
+    - [ORM^O01 (Order)](#ormo01-order)
+    - [ORU^R01 (Observation Result)](#orur01-observation-result)
     - [List supported events](#list-supported-events)
+  - [Serialize FHIR -> RDF](#serialize-fhir---rdf)
 - [HL7 Stream Generator](#hl7-stream-generator)
 - [Development](#development)
 - [Continuous Integration](#continuous-integration)
 - [Status](#status)
-
 - [Ontology Model](#ontology-model)
+- [GraphDB Integration](#graphdb-integration)
 - [SPARQL Testing](#sparql-testing)
 - [SHACL Testing](#shacl-testing)
-
 - [License](#license)
 
 ---
@@ -53,26 +55,21 @@ Healthcare systems still run on HL7 v2 (ADT/ORU/ORM messages) while modern inter
   - SPARQL queries for cohorts, outcomes, and KPI dashboards.  
   - SHACL constraints for data quality and conformance checks (e.g., every Encounter must have a Patient; Observations must have LOINC codes where expected).  
 
-### Where Java Fits
+### Java Integration Pathways
 
-- **Enterprise Connectors**: Many hospitals and integration engines run on the JVM. A Java module can:  
-  - Consume the same FHIR outputs (via HAPI FHIR) for server-side validation, persistence, and RESTful exposure.  
-  - Offer HL7 v2 interfaces where JVM-based tools (Mirth/NextGen Connect, Camel, Spring Integration) are standard.  
-  - Run SHACL validation (via Java RDF libraries) and publish results to operational dashboards.  
-- **Production Hardening**: JVM services can wrap the Python transforms for scale (queue workers, retries, circuit breakers) and integrate with existing enterprise logging and SSO.  
+A Java integration layer is planned for a future phase. Many hospitals and integration engines run on the JVM, and the FHIR outputs this pipeline produces are well-suited for consumption by HAPI FHIR, Mirth/NextGen Connect, and Spring Integration. See the open issue for scope and design notes.
 
 ---
 
 ## Why LOINC Matters Here
 
-Lab results and clinical observations are only as useful as the codes behind them. Different hospitals and labs label the same test in inconsistent ways ("Glucose, fasting plasma" vs. "FPG" vs. "GLU-F"). The Logical Observation Identifiers Names and Codes (LOINC) standard provides a universal vocabulary for lab tests, vital signs, and other measurements. 
+Lab results and clinical observations are only as useful as the codes behind them. Different hospitals and labs label the same test in inconsistent ways ("Glucose, fasting plasma" vs. "FPG" vs. "GLU-F"). The Logical Observation Identifiers Names and Codes (LOINC) standard provides a universal vocabulary for lab tests, vital signs, and other measurements.
 
 - **HL7 v2**: ORU messages carry test identifiers in OBX segments, which can (and should) reference LOINC codes.  
 - **FHIR**: Observations and DiagnosticReports are expected to use LOINC as their coding system, ensuring that "glucose test" means the same thing everywhere.  
 - **RDF/SPARQL**: Once FHIR Observations are serialized into RDF, LOINC codes allow cross-institution queries like:  
   - "Find all patients with HbA1c (LOINC 4548-4) above 8.0."  
   - "Count distinct LOINC-coded blood pressure observations in the last 6 months."  
-- **Java Integration**: Enterprise-grade tools can validate LOINC coding in Observations, enforce SHACL rules (e.g., "Every Observation must carry a valid LOINC code if it is a lab test"), and publish results to downstream systems.  
 
 By including LOINC in the HL7 -> FHIR transformation, this project not only normalizes messy legacy data but also anchors it in the globally recognized clinical coding ecosystem, enabling meaningful analytics, interoperability, and quality checks across systems.
 
@@ -87,28 +84,28 @@ If LOINC tells us *what was measured*, ICD-10 tells us *what condition the patie
 - **RDF/SPARQL**: ICD-10 enables semantic queries such as:  
   - "Find all patients discharged with ICD-10 I21 (acute myocardial infarction)."  
   - "Count patients with ICD-10 E11.9 who also have an HbA1c (LOINC 4548-4) test over 8.0."  
-- **Java Integration**: Enterprise-grade tools can validate ICD-10 coding in Conditions, enforce SHACL rules (e.g., "Every Encounter must reference at least one ICD-10-coded Condition"), and feed ICD-10-coded data into quality reporting or claims workflows.  
 
-By including ICD-10 in the HL7 -> FHIR transformation, this project does more than parse messages — it aligns patient encounters and diagnoses with internationally recognized codes. That ensures the data can be used reliably for analytics, interoperability, regulatory reporting, and reimbursement.
+By including ICD-10 in the HL7 -> FHIR transformation, this project does more than parse messages -- it aligns patient encounters and diagnoses with internationally recognized codes. That ensures the data can be used reliably for analytics, interoperability, regulatory reporting, and reimbursement.
 
 ---
 
 ## HL7 to FHIR Flow Diagram
 
 The diagram below summarizes how HL7 v2 messages (ADT, ORM, ORU) map to FHIR resources, and where ICD-10 and LOINC fit in.  
-It also shows optional RDF/SPARQL/SHACL and Java integration layers.
+It also shows RDF/SPARQL/SHACL and (yet to be implemented) Java integration layers.
 
-![HL7 to FHIR Detailed Flow – Dark](images/hl7_fhir_detailed_flow_dark.png#gh-dark-mode-only)
-![HL7 to FHIR Detailed Flow – Light](images/hl7_fhir_detailed_flow.png#gh-light-mode-only)
-
+![HL7 to FHIR Detailed Flow -- Dark](images/hl7_fhir_detailed_flow_dark.png#gh-dark-mode-only)
+![HL7 to FHIR Detailed Flow -- Light](images/hl7_fhir_detailed_flow.png#gh-light-mode-only)
 
 ---
 
 ## Features
 
 - Parse HL7 v2 messages (using [`hl7apy`](https://crs4.github.io/hl7apy/))
-- Parse FHIR JSON or XML (using [`pydantic-fhir`](https://github.com/nazrulworld/fhir.resources))
+- Parse FHIR JSON or XML (using [`fhir.resources`](https://github.com/nazrulworld/fhir.resources))
 - Transform HL7 v2 -> FHIR resource structures (ADT^A01/A03/A08, ORM^O01, ORU^R01)
+- Serialize FHIR resources -> RDF/Turtle using a custom OWL ontology (hft: namespace, rdfs:subClassOf fhir:)
+- Load RDF output into GraphDB and run SPARQL cohort queries
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
 
@@ -309,7 +306,6 @@ _Output:_
     "reference": "Patient/12345"
   }
 }
-
 ```
 
 _With OBR-driven code (e.g., OBR-4):_
@@ -357,12 +353,11 @@ _Output:_
     "reference": "Patient/12345"
   }
 }
-
 ```
 
 _Mapping notes:_
 - **ORC-2/ORC-3** -> `ServiceRequest.identifier` (placer/filler numbers)
-- **ORC-5** (order status) -> `ServiceRequest.status` (e.g., `NW` ⇒ `active`, `CA` ⇒ `revoked`, `CM` ⇒ `completed`)
+- **ORC-5** (order status) -> `ServiceRequest.status` (e.g., `NW` -> `active`, `CA` -> `revoked`, `CM` -> `completed`)
 - **OBR-4** (Universal Service ID) -> `ServiceRequest.code` (prefer LOINC when available)
 - **PID** -> `Patient` (linked via `ServiceRequest.subject`)
 
@@ -426,16 +421,7 @@ _Mapping notes:_
 - **OBX-3** -> `Observation.code` (use LOINC if available)
 - **PID** -> `Patient` (linked via `Observation.subject`)
 
-
-
 ### List supported events
-
----
-
-
-
----
-
 
 ```bash
 python -m src.hl7_fhir_tool.cli transform - --list
@@ -449,6 +435,50 @@ Registered HL7 v2 -> FHIR events:
     ORM^O01
     ORU^R01
 ```
+
+### Serialize FHIR -> RDF
+
+The `to-rdf` command runs the full HL7 -> FHIR -> RDF pipeline in one step and writes a Turtle file.
+
+```bash
+python -m src.hl7_fhir_tool.cli to-rdf tests/data/oru_r01_min.hl7 --output-dir out/
+```
+_Output:_
+```
+Wrote out/oru_r01_min.ttl  (12 triples)
+```
+
+_Sample Turtle output:_
+```turtle
+@prefix hft: <http://example.org/hl7-fhir-tool#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+hft:Observation_obs-P12345-1 a hft:NumericObservation ;
+    hft:hasCode <http://example.org/code/GLU> ;
+    hft:hasUnit "mg/dL"^^xsd:string ;
+    hft:identifier "1234"^^xsd:string,
+        "5678"^^xsd:string ;
+    hft:observationSubject hft:Patient_P12345 ;
+    hft:status "final"^^xsd:string ;
+    hft:valueDecimal 110.0 .
+
+hft:Patient_P12345 a hft:Patient ;
+    hft:birthDate "1983-05-14"^^xsd:date ;
+    hft:family "Doe"^^xsd:string ;
+    hft:gender hft:female ;
+    hft:given "Jane"^^xsd:string .
+```
+
+Each hft: class declares `rdfs:subClassOf` its canonical fhir: counterpart, making the hft: namespace an extension of FHIR rather than a parallel vocabulary. Queries and reasoners operating on fhir: terms will pick up hft: individuals through the subclass link.
+
+Write to stdout instead of a file:
+
+```bash
+python -m src.hl7_fhir_tool.cli to-rdf tests/data/oru_r01_min.hl7 --stdout
+```
+
+---
+
 ## HL7 Stream Generator
 
 A synthetic HL7 v2.5.1 generator is included for producing realistic test streams for all supported message types (ADT^A01, ADT^A03, ADT^A08, ORM^O01, ORU^R01).  
@@ -468,7 +498,6 @@ python scripts/generate_hl7_adt_a01_bulk.py \
     --seed 22 \
     --line-endings cr
 ```
-
 
 The generator is deterministic under a fixed seed and does not create any FHIR or RDF output; it is used solely for producing input for the transformation layer.
 
@@ -507,12 +536,10 @@ This project is an evolving prototype interoperability toolkit, positioned at th
 - Healthcare standards mastery: HL7 v2 messaging, FHIR resource modeling, LOINC for labs, ICD-10 for diagnoses.
 - Data transformation and normalization: Converting brittle HL7 v2 feeds into structured, FHIR-compliant resources.
 - Knowledge graph readiness: RDF serialization, SPARQL queries, and SHACL validation for advanced analytics and conformance checking.
-- Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design, and integration pathways for Java ecosystems.
+- End-to-end pipeline: HL7 v2 messages loaded into GraphDB as RDF triples and queried with SPARQL. The current test corpus (3 HL7 messages covering ADT, ORM, and ORU) produces 123 RDF triples.
+- Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design.
 
 This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.
-
----
-
 
 ---
 
@@ -525,12 +552,46 @@ It lives in `rdf/ontology/hl7_fhir_tool_schema.ttl` and includes:
 - **Object properties:** `hasSubject`, `hasCode`, `hasPart`, `basedOn`, etc.  
 - **Data properties:** `identifier`, `birthDate`, `status`, `valueDecimal`, and related attributes  
 
-These definitions ensure semantic integrity between transformed FHIR data and their relationships in RDF.  
-Open it in **Protégé** or **TopBraid** for exploration or editing.
+Each hft: class declares `rdfs:subClassOf` its canonical fhir: counterpart. This alignment makes hft: an extension of FHIR rather than a parallel vocabulary -- queries and reasoners operating on fhir: terms will pick up hft: individuals through the subclass link.
+
+Open it in **Protege** or **TopBraid** for exploration or editing.
 
 ```bash
 protege "file://$PWD/rdf/ontology/hl7_fhir_tool_schema.ttl"
 ```
+
+---
+
+## GraphDB Integration
+
+RDF output from the pipeline can be loaded directly into GraphDB for SPARQL querying and graph exploration.
+
+### Loading data
+
+1. Create a repository in the GraphDB Workbench: **Setup -> Repositories -> Create new repository**
+2. Switch to the new repository
+3. Import Turtle files: **Import -> RDF Files -> Upload Files**
+
+### Cohort query example
+
+The query below finds all patients with a Type 2 diabetes diagnosis (ICD-10 E11.9) who also have an HbA1c observation (LOINC 4548-4) above 8.0. It runs against `tests/data/cohort_sample.ttl`, which is included in the repo as a reference dataset.
+
+```sparql
+PREFIX hft: <http://example.org/hl7-fhir-tool#>
+
+SELECT ?patient ?family ?value WHERE {
+  ?patient a hft:Patient ;
+           hft:family ?family .
+  ?cond hft:conditionSubject ?patient ;
+        hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
+  ?obs hft:observationSubject ?patient ;
+       hft:hasCode <http://loinc.org/4548-4> ;
+       hft:valueDecimal ?value .
+  FILTER (?value > 8.0)
+}
+```
+
+![GraphDB cohort query result](images/graphdb_cohort_query.png)
 
 ---
 
@@ -545,14 +606,14 @@ Queries live under `rdf/queries/` and are grouped into subfolders:
 | `data_quality/` | Detect missing or invalid instance data (e.g., missing subjects, values, or codes) |
 | `cohorts/` | Cohort definitions and clinical logic (e.g., Diabetes + HbA1c > 8.0) |
 
-Run all SPARQL checks using Apache Jena’s **ARQ** engine:
+Run all SPARQL checks using Apache Jena's **ARQ** engine:
 
 ```bash
 bash tools/run_sparql_checks.sh
 ```
 
 Example output excerpt:
-```bash
+```
 == Cohorts (expect rows) ==
 >>> rdf/queries/cohorts/cohort_e11_9_hba1c_over_8.rq
 ?patient  ?value
@@ -600,8 +661,8 @@ Warnings (sum): 0
 Result        : ALL EXPECTATIONS MET
 ```
 
-Run SHACL validation via **pySHACL** on **multiple** data where some of them are 
-marked as being expected to violate.  The ones that violate as expected are passes:
+Run SHACL validation via **pySHACL** on **multiple** data files where some are marked as expected to violate. The ones that violate as expected are passes:
+
 ```bash
     python tools/run_shacl.py \
         --data \
@@ -634,7 +695,8 @@ Warnings (sum): 0
 Result        : ALL EXPECTATIONS MET
 ```
 
-A run on the same shapes and data **without** `--expected fail` produces failures:
+A run on the same shapes and data **without** `--expected-fail` produces failures:
+
 ```bash
     python tools/run_shacl.py \
         --data \
@@ -663,7 +725,8 @@ Warnings (sum): 0
 Result        : EXPECTATIONS NOT MET
 ```
 
-Include `--details fail` or `--details all` to get more verbose output:
+Include `--details fail` or `--details all` for verbose output:
+
 ```bash
     python tools/run_shacl.py \
         --data \
@@ -718,7 +781,7 @@ Constraint Violation in MinCountConstraintComponent (http://www.w3.org/ns/shacl#
         Message: Encounter must reference a Patient (encounterSubject/subject).
 Constraint Violation in InConstraintComponent (http://www.w3.org/ns/shacl#InConstraintComponent):
         Severity: sh:Violation
-        Source Shape: [ sh:in ( Literal("registered") Literal("preliminary") Literal("final") Literal("amended") Literal("partial") Literal("draft") Literal("active") Literal("completed") Literal("revoked") ) ; sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
+        Source Shape: [ sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
         Focus Node: ex:SR2
         Value Node: Literal("bogus")
         Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ]
@@ -740,7 +803,7 @@ Conforms: True
       Inference     : rdfs
 
 -----------------------------------------------------------------------
-Files Checked : 3
+Files Checked       : 3
 Failures      : 0
 Warnings (sum): 0
 Result        : ALL EXPECTATIONS MET
@@ -748,7 +811,7 @@ Result        : ALL EXPECTATIONS MET
 
 **Interpreting results:**
 - `ALL EXPECTATIONS MET` -> all shapes satisfied.
-- `EXPECTATIONS NOT MET` -> not all shapes satisfied. 
+- `EXPECTATIONS NOT MET` -> not all shapes satisfied.
 
 ---
 

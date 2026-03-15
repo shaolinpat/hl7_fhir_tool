@@ -44,8 +44,8 @@ def _validate(data_rel, shapes=SHAPES):
     dg = Graph().parse(data, format="turtle")
 
     # --------------------------------------------------------------------------
-    # Include enumerations (hft:male, hft:female, etc.) as data facts
-    # so that sh:class hft:AdminstrativeGenderCode succeeds.
+    # include enumerations (hft:male, hft:female, etc.) as data facts
+    # so that sh:class hft:AdminstrativeGenderCode succeeds
     # --------------------------------------------------------------------------
     ontology_path = os.path.join(ROOT, "rdf/ontology/hl7_fhir_tool_schema.ttl")
     if os.path.exists(ontology_path):
