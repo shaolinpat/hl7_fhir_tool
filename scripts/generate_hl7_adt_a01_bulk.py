@@ -12,6 +12,8 @@ Supported (registered) HL7 v2 -> FHIR events:
 Features:
 - Produces messages with MSH, EVN (for ADT), PID, PV1 and appropriate
   order/observation segments where applicable (ORC/OBR/OBX)
+- ADT messages (A01, A03, A08) include a DG1 segment with a randomly selected
+  ICD-10 code from a small built-in pool
 - Rotates or fixes line endings: CR, LF, CRLF (HL7 expects CR)
 - Deterministic output with --seed
 - No external dependencies
@@ -114,6 +116,23 @@ CITIES = [
 STATES = ["OH", "MA", "CO", "TX", "WA", "OR", "IL", "AZ", "GA", "NC"]
 
 SEX_CODES = ["M", "F", "O", "U"]  # Male/Female/Other/Unknown
+
+# Small ICD-10 pool for synthetic DG1 segments.
+# Format: (code, description, coding_system)
+_ICD10_POOL = [
+    ("E11.9", "Type 2 diabetes mellitus without complications", "I10"),
+    ("I10", "Essential (primary) hypertension", "I10"),
+    ("J44.1", "COPD with acute exacerbation", "I10"),
+    ("N18.3", "Chronic kidney disease stage 3", "I10"),
+    ("F32.1", "Major depressive disorder single episode moderate", "I10"),
+    ("Z87.891", "Personal history of nicotine dependence", "I10"),
+    ("M54.5", "Low back pain", "I10"),
+    (
+        "I25.10",
+        "Atherosclerotic heart disease of native coronary artery without angina",
+        "I10",
+    ),
+]
 
 
 def _rand_phone(rng: random.Random) -> str:
@@ -221,7 +240,7 @@ def _make_common_segments(
 
 def _make_adt_a01_message(rng: random.Random, idx: int, base_dt: datetime) -> str:
     """
-    Construct a synthetic ADT^A01 admit message.
+    Construct a synthetic ADT^A01 admit message with a DG1 segment.
     """
     dt = base_dt + timedelta(minutes=idx)
     msg_ts = _ts(dt)
@@ -237,12 +256,14 @@ def _make_adt_a01_message(rng: random.Random, idx: int, base_dt: datetime) -> st
         demo=demo,
     )
     msh = f"{msh_prefix}ADT^A01|{msg_cntrl}|P|{ver}"
-    return "\n".join([msh, evn, pid, pv1])
+    code, desc, sys = rng.choice(_ICD10_POOL)
+    dg1 = f"DG1|1||{code}^{desc}^{sys}"
+    return "\n".join([msh, evn, pid, pv1, dg1])
 
 
 def _make_adt_a03_message(rng: random.Random, idx: int, base_dt: datetime) -> str:
     """
-    Construct a synthetic ADT^A03 discharge message.
+    Construct a synthetic ADT^A03 discharge message with a DG1 segment.
     """
     dt = base_dt + timedelta(minutes=idx)
     msg_ts = _ts(dt)
@@ -258,12 +279,15 @@ def _make_adt_a03_message(rng: random.Random, idx: int, base_dt: datetime) -> st
         demo=demo,
     )
     msh = f"{msh_prefix}ADT^A03|{msg_cntrl}|P|{ver}"
-    return "\n".join([msh, evn, pid, pv1])
+    code, desc, sys = rng.choice(_ICD10_POOL)
+    dg1 = f"DG1|1||{code}^{desc}^{sys}"
+    return "\n".join([msh, evn, pid, pv1, dg1])
 
 
 def _make_adt_a08_message(rng: random.Random, idx: int, base_dt: datetime) -> str:
     """
-    Construct a synthetic ADT^A08 update-patient-information message.
+    Construct a synthetic ADT^A08 update-patient-information message with a DG1
+    segment.
     """
     dt = base_dt + timedelta(minutes=idx)
     msg_ts = _ts(dt)
@@ -279,7 +303,9 @@ def _make_adt_a08_message(rng: random.Random, idx: int, base_dt: datetime) -> st
         demo=demo,
     )
     msh = f"{msh_prefix}ADT^A08|{msg_cntrl}|P|{ver}"
-    return "\n".join([msh, evn, pid, pv1])
+    code, desc, sys = rng.choice(_ICD10_POOL)
+    dg1 = f"DG1|1||{code}^{desc}^{sys}"
+    return "\n".join([msh, evn, pid, pv1, dg1])
 
 
 def _make_orm_o01_message(rng: random.Random, idx: int, base_dt: datetime) -> str:

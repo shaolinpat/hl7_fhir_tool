@@ -131,6 +131,7 @@ class ADTA01Transformer(Transformer):
         if ident_val:
             # fhir.resources converts dicts to Identifier models
             p.identifier = [{"value": ident_val}]
+            p.id = ident_val
 
         # Name: PID-5[0] family/given (simple)
         family, given = _pid_name(pid)

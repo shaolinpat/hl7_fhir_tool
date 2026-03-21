@@ -45,7 +45,7 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
 
 Healthcare systems still run on HL7 v2 (ADT/ORU/ORM messages) while modern interoperability and analytics increasingly depend on FHIR APIs and knowledge graphs. This repo bridges that gap:
 
-- **HL7 v2 -> FHIR**: Transforms core events (ADT^A01 admit, ADT^A03 discharge, ADT^A08 patient update, ORU lab results, ORM orders) into clean FHIR resources (Patient, Encounter, Observation, ServiceRequest, DiagnosticReport).  
+- **HL7 v2 -> FHIR**: Transforms core events (ADT^A01 admit, ADT^A03 discharge, ADT^A08 patient update, ORU lab results, ORM orders) into clean FHIR resources (Patient, Encounter, Condition, Observation, ServiceRequest, DiagnosticReport).  
 - **Standards Alignment**: Positions legacy hospital feeds for use in FHIR-native apps, analytics platforms, and regulatory use cases (patient access, care coordination, research).  
 - **Data Reuse**: Converts brittle, site-specific HL7 v2 streams into structured, web-friendly FHIR models that downstream systems can trust.  
 
@@ -104,6 +104,7 @@ It also shows RDF/SPARQL/SHACL and (yet to be implemented) Java integration laye
 - Parse HL7 v2 messages (using [`hl7apy`](https://crs4.github.io/hl7apy/))
 - Parse FHIR JSON or XML (using [`fhir.resources`](https://github.com/nazrulworld/fhir.resources))
 - Transform HL7 v2 -> FHIR resource structures (ADT^A01/A03/A08, ORM^O01, ORU^R01)
+- DG1 segment parsing -> FHIR Condition resources with ICD-10 code bindings (ADT^A01/A03/A08)
 - Serialize FHIR resources -> RDF/Turtle using a custom OWL ontology (hft: namespace, rdfs:subClassOf fhir:)
 - Load RDF output into GraphDB and run SPARQL cohort queries
 - Minimal, production-style CLI for batch and file-level workflows
@@ -171,6 +172,8 @@ _Output:_
 ### Transform HL7 v2 -> FHIR
 
 #### ADT^A01 (Admit)
+
+_Without DG1:_
 ```bash
 python -m src.hl7_fhir_tool.cli transform tests/data/adt_a01_251.hl7 --stdout --pretty
 ```
@@ -178,6 +181,7 @@ _Output:_
 ```json
 {
   "resourceType": "Patient",
+  "id": "12345",
   "identifier": [
     {
       "value": "12345"
@@ -198,6 +202,55 @@ _Output:_
 {
   "resourceType": "Encounter",
   "status": "in-progress"
+}
+```
+
+_With DG1 (ICD-10 diagnosis):_
+```bash
+python -m src.hl7_fhir_tool.cli transform tests/data/adt_a01_with_dg1.hl7 --stdout --pretty
+```
+_Output:_
+```json
+{
+  "resourceType": "Patient",
+  "id": "12345",
+  "identifier": [
+    {
+      "value": "12345"
+    }
+  ],
+  "name": [
+    {
+      "family": "Doe",
+      "given": [
+        "John"
+      ]
+    }
+  ],
+  "gender": "male",
+  "birthDate": "1970-01-01"
+}
+
+{
+  "resourceType": "Encounter",
+  "status": "in-progress"
+}
+
+{
+  "resourceType": "Condition",
+  "id": "cond-12345-1",
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/sid/icd-10",
+        "code": "E11.9"
+      }
+    ],
+    "text": "Type 2 diabetes mellitus without complications"
+  },
+  "subject": {
+    "reference": "Patient/12345"
+  }
 }
 ```
 
@@ -469,6 +522,35 @@ hft:Patient_P12345 a hft:Patient ;
     hft:given "Jane"^^xsd:string .
 ```
 
+_ADT^A01 with DG1 (ICD-10 diagnosis):_
+```bash
+python -m src.hl7_fhir_tool.cli to-rdf tests/data/adt_a01_with_dg1.hl7 --output-dir out/
+```
+_Output:_
+```
+Wrote out/adt_a01_with_dg1.ttl  (11 triples)
+```
+
+_Turtle output:_
+```turtle
+@prefix hft: <http://example.org/hl7-fhir-tool#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+hft:Condition_cond-12345-1 a hft:Condition ;
+    hft:conditionSubject hft:Patient_12345 ;
+    hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
+
+hft:Encounter_unknown a hft:Encounter ;
+    hft:status "in-progress"^^xsd:string .
+
+hft:Patient_12345 a hft:Patient ;
+    hft:birthDate "1970-01-01"^^xsd:date ;
+    hft:family "Doe"^^xsd:string ;
+    hft:gender hft:male ;
+    hft:given "John"^^xsd:string ;
+    hft:identifier "12345"^^xsd:string .
+```
+
 Each hft: class declares `rdfs:subClassOf` its canonical fhir: counterpart, making the hft: namespace an extension of FHIR rather than a parallel vocabulary. Queries and reasoners operating on fhir: terms will pick up hft: individuals through the subclass link.
 
 Write to stdout instead of a file:
@@ -486,6 +568,8 @@ It generates pure HL7 messages and can output:
 
 - Individual `.hl7` files (one per message)
 - A single concatenated HL7 stream file for ingestion into the transformation pipeline
+
+ADT messages (A01, A03, A08) include a `DG1` segment with a randomly selected ICD-10 code drawn from a built-in pool of eight common diagnoses. ORM and ORU messages do not include DG1.
 
 Example (300-message mixed stream):
 
@@ -720,7 +804,7 @@ Shapes Loaded : 10
 [  3/3] PASS  tests/data/fhir_valid.ttl
 -----------------------------------------------------------------------
 Files Checked : 3
-Failures      : 2
+Failures      : 0
 Warnings (sum): 0
 Result        : EXPECTATIONS NOT MET
 ```
