@@ -16,6 +16,8 @@ from fhir.resources.resource import Resource
 
 from ..registry import register
 
+from ._dg1 import build_conditions
+
 import logging
 
 
@@ -130,7 +132,12 @@ class ADTA08Transformer:
         """
         patient = self._build_patient(getattr(msg, "PID", None))
         encounter = self._build_encounter(getattr(msg, "PV1", None), patient)
-        return [patient, encounter]
+
+        resources: List[Resource] = [patient, encounter]
+        resources.extend(
+            build_conditions(msg, getattr(patient, "id", None) or "unknown")
+        )
+        return resources
 
     @staticmethod
     def _build_patient(pid: object | None) -> Patient:

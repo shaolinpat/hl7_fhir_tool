@@ -16,6 +16,8 @@ from fhir.resources.resource import Resource
 
 from ..registry import register
 
+from ._dg1 import build_conditions
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -212,4 +214,8 @@ class ADTA03Transformer:
             ),
         )
 
-        return [patient, encounter]
+        resources: List[Resource] = [patient, encounter]
+        resources.extend(
+            build_conditions(msg, getattr(patient, "id", None) or "unknown")
+        )
+        return resources

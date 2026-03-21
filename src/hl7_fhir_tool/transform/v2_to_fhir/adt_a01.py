@@ -22,6 +22,8 @@ from fhir.resources.patient import Patient
 from fhir.resources.encounter import Encounter
 from fhir.resources.resource import Resource
 
+from ._dg1 import build_conditions
+
 from ..registry import register
 from ..base import Transformer
 
@@ -93,13 +95,18 @@ class ADTA01Transformer(Transformer):
     def transform(self, msg: Message) -> List[Resource]:
         """
         Produce a minimal Patient and Encounter from PID and PV1.
+        Appends a Condition for each DG1 segment present in the message.
         """
         # Accept either uppercase (segment objects) or lowercase (hl7apy proxies)
         patient = self._build_patient(getattr(msg, "PID", getattr(msg, "pid", None)))
         encounter = self._build_encounter(
             getattr(msg, "PV1", getattr(msg, "pv1", None))
         )
-        return [patient, encounter]
+        resources: List[Resource] = [patient, encounter]
+        resources.extend(
+            build_conditions(msg, getattr(patient, "id", None) or "unknown")
+        )
+        return resources
 
     # --------------------------------------------------------------------------
     # internal helpers
