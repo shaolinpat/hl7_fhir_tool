@@ -30,6 +30,7 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
     - [List supported events](#list-supported-events)
   - [Serialize FHIR -> RDF](#serialize-fhir---rdf)
 - [HL7 Stream Generator](#hl7-stream-generator)
+- [End-to-End Pipeline](#end-to-end-pipeline)
 - [Development](#development)
 - [Continuous Integration](#continuous-integration)
 - [Status](#status)
@@ -107,6 +108,7 @@ It also shows RDF/SPARQL/SHACL and (yet to be implemented) Java integration laye
 - DG1 segment parsing -> FHIR Condition resources with ICD-10 code bindings (ADT^A01/A03/A08)
 - Serialize FHIR resources -> RDF/Turtle using a custom OWL ontology (hft: namespace, rdfs:subClassOf fhir:)
 - Load RDF output into GraphDB and run SPARQL cohort queries
+- Single-command end-to-end pipeline: generate HL7 -> RDF -> GraphDB via `tools/run_pipeline.sh`
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
 
@@ -587,6 +589,73 @@ The generator is deterministic under a fixed seed and does not create any FHIR o
 
 ---
 
+## End-to-End Pipeline
+
+`tools/run_pipeline.sh` runs the full pipeline in one command: generates synthetic HL7
+messages, transforms each to RDF/Turtle, clears the GraphDB repository, and loads all
+Turtle files.
+
+**Prerequisites:**
+- GraphDB running at `localhost:7200` with a repository named `hl7_fhir`
+- `hl7_fhir_env` conda environment active
+- Run from the project root
+
+**Basic run (100 mixed messages, seed 22):**
+
+```bash
+bash tools/run_pipeline.sh
+```
+
+**Custom run:**
+
+```bash
+bash tools/run_pipeline.sh \
+    --count 300 \
+    --message-type mixed_registered \
+    --seed 42 \
+    --repo hl7_fhir
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--count` | 100 | Number of HL7 messages to generate |
+| `--seed` | 22 | Random seed for reproducible output |
+| `--message-type` | `mixed_registered` | One of: `adt_a01`, `adt_a03`, `adt_a08`, `orm_o01`, `oru_r01`, `mixed_registered` |
+| `--repo` | `hl7_fhir` | GraphDB repository name |
+
+**Expected output:**
+
+```
+==> Step 1: generating 100 HL7 messages (type=mixed_registered, seed=22)
+Generated 100 messages in out/hl7
+
+==> Step 2: transforming HL7 -> RDF/Turtle
+    Transformed: 100  Skipped/failed: 0
+
+==> Step 3: clearing GraphDB repository 'hl7_fhir' at http://localhost:7200
+    Repository cleared (HTTP 204)
+
+==> Step 4: loading 100 Turtle files into GraphDB
+    Loaded: 100  Failed: 0
+
+==> Pipeline complete
+    HL7 messages : 100
+    TTL files    : 100
+    Loaded       : 100
+    Repository   : hl7_fhir @ http://localhost:7200
+
+Open GraphDB Workbench to explore:
+    http://localhost:7200/sparql
+```
+
+Generated files land in `out/hl7/` (HL7 messages) and `out/rdf/` (Turtle files). Both
+directories are overwritten on each run. A 100-message mixed corpus produces approximately
+998 RDF triples in GraphDB.
+
+---
+
 ## Development
 
 Run tests with coverage:
@@ -620,7 +689,7 @@ This project is an evolving prototype interoperability toolkit, positioned at th
 - Healthcare standards mastery: HL7 v2 messaging, FHIR resource modeling, LOINC for labs, ICD-10 for diagnoses.
 - Data transformation and normalization: Converting brittle HL7 v2 feeds into structured, FHIR-compliant resources.
 - Knowledge graph readiness: RDF serialization, SPARQL queries, and SHACL validation for advanced analytics and conformance checking.
-- End-to-end pipeline: HL7 v2 messages loaded into GraphDB as RDF triples and queried with SPARQL. The current test corpus (3 HL7 messages covering ADT, ORM, and ORU) produces 123 RDF triples.
+- End-to-end pipeline: HL7 v2 messages generated, transformed to RDF, and loaded into GraphDB via a single script. A 100-message mixed corpus produces 998 RDF triples.
 - Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design.
 
 This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.

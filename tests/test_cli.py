@@ -388,7 +388,7 @@ def test_parse_hl7_for_cli_orm_fallback_invokes_find_groups_and_cr(monkeypatch):
     monkeypatch.setattr(cli, "parse_hl7_v2", bad_parser, raising=True)
     monkeypatch.setattr(cli, "parse_message", ok_parse_message, raising=True)
     monkeypatch.setattr(
-        cli, "VALIDATION_LEVEL", types.SimpleNamespace(STRICT=1), raising=True
+        cli, "VALIDATION_LEVEL", types.SimpleNamespace(TOLERANT=1), raising=True
     )
 
     msg_txt = (
@@ -403,24 +403,26 @@ def test_parse_hl7_for_cli_orm_fallback_invokes_find_groups_and_cr(monkeypatch):
     assert "\r" in calls.get("content", ""), "Expected CRs in normalized content"
     assert "\n" not in calls.get("content", ""), "LFs should be normalized to CRs"
     assert calls.get("find_groups") is True
+    assert calls.get("validation_level") == 1
 
 
 def test_parse_hl7_for_cli_non_orm_failure_propagates(monkeypatch):
 
-    class MyErr(Exception):
-        pass
+    def bad_primary(_txt):
+        raise RuntimeError("primary failed")
 
-    def bad_parser(_txt):
-        raise MyErr("no fallback for non-ORM")
+    def bad_tolerant(content, *, validation_level=None, find_groups=None, **_k):
+        raise RuntimeError("tolerant also failed")
 
-    monkeypatch.setattr(cli, "parse_hl7_v2", bad_parser, raising=True)
+    monkeypatch.setattr(cli, "parse_hl7_v2", bad_primary, raising=True)
+    monkeypatch.setattr(cli, "parse_message", bad_tolerant, raising=True)
+    monkeypatch.setattr(
+        cli, "VALIDATION_LEVEL", types.SimpleNamespace(TOLERANT=1), raising=True
+    )
 
     msg_txt = "MSH|^~\\&|LAB|HOSP|EHR|HOSP|202501011200||ADT^A01|MSG0001|P|2.5\rPID|1||12345||Doe^John^A\r"
-    with pytest.raises(MyErr) as e:
+    with pytest.raises(cli.HL7FHIRToolError, match="Failed to parse HL7 v2 message"):
         cli._parse_hl7_for_cli(msg_txt)
-
-    assert "no fallback" in str(e.value)
-    assert isinstance(e.value, MyErr)
 
 
 @pytest.mark.parametrize(
@@ -461,7 +463,7 @@ def test_parse_hl7_for_cli_covers_label_make_msg(monkeypatch, label, make_msg):
     monkeypatch.setattr(cli, "parse_hl7_v2", bad_primary, raising=True)
     monkeypatch.setattr(cli, "parse_message", spy_parse_message, raising=True)
     monkeypatch.setattr(
-        cli, "VALIDATION_LEVEL", types.SimpleNamespace(STRICT=123), raising=True
+        cli, "VALIDATION_LEVEL", types.SimpleNamespace(TOLERANT=123), raising=True
     )
 
     msg_txt = make_msg()

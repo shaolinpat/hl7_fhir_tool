@@ -461,7 +461,7 @@ def _apply_line_endings(text: str, mode: str, idx: int) -> bytes:
         sep = "\r\n"
     else:
         raise ValueError("line endings must be one of: cr|lf|crlf|mix")
-    return sep.join(text.splitlines()).encode("utf-8")
+    return (sep.join(text.splitlines()) + sep).encode("utf-8")
 
 
 def parse_args() -> argparse.Namespace:

@@ -513,29 +513,41 @@ def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
 
 def _parse_hl7_for_cli(content: str) -> Message:
     """
-    Parse HL7 v2 text with project default, and fall back to hl7apy group
-    inference for messages that otherwise fail with "PID is not a valid child
-    for <Message ...>".
+    Parse HL7 v2 text, falling back to tolerant validation when strict mode
+    rejects the message.
 
-    This currently ony happens with ORM^O01 messages but there may be others.
+    hl7apy strict validation rejects some valid message/segment combinations
+    (e.g., DG1 in ADT^A08) with "Cannot instantiate an unknown Element with
+    strict validation". Tolerant mode accepts these without data loss.
+
+    The fallback also enables find_groups=True for ORM^O01 and ORU^R01, which
+    require group inference to avoid "PID is not a valid child" errors.
     """
     try:
         return parse_hl7_v2(content)
-    except Exception:
-        # if "ORM^O01" not in content:
-        if not any(k in content for k in ("ORM^O01", "ORU^R01")):
-            raise
-
-        # Try hl7apy with find_groups=True
-        if "\r" not in content and "\n" in content:
-            content = content.replace("\n", "\r")
-
-        msg = parse_message(
-            content,
-            validation_level=VALIDATION_LEVEL.STRICT,
-            find_groups=True,
+    except Exception as strict_exc:
+        LOG.debug(
+            "Strict parse failed (%s), retrying with tolerant validation",
+            strict_exc,
         )
-        return msg
+
+    # Normalize line endings for hl7apy
+    if "\r" not in content and "\n" in content:
+        content = content.replace("\n", "\r")
+
+    find_groups = any(k in content for k in ("ORM^O01", "ORU^R01"))
+
+    try:
+        return parse_message(
+            content,
+            validation_level=VALIDATION_LEVEL.TOLERANT,
+            find_groups=find_groups,
+        )
+    except Exception as tolerant_exc:
+        # Re-raise with full context so the caller gets a useful traceback
+        raise HL7FHIRToolError(
+            f"Failed to parse HL7 v2 message: {tolerant_exc}"
+        ) from tolerant_exc
 
 
 # -------------------------------------------------------------------------------
@@ -778,7 +790,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         return EXIT_CLI
 
     except HL7FHIRToolError as e:
-        LOG.error("%s", e)
+        LOG.error("%s", e, exc_info=True)
         return EXIT_ERR
     except KeyboardInterrupt:
         LOG.error("Interrupted")
