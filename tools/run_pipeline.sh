@@ -5,7 +5,8 @@
 #   1. Generate synthetic HL7 v2.5.1 messages
 #   2. Transform each message to RDF/Turtle via the to-rdf CLI
 #   3. Clear the GraphDB repository
-#   4. Load all Turtle files into GraphDB
+#   4. Load the ontology TTL (required for RDFS inference)
+#   5. Load all data Turtle files into GraphDB
 #
 # Usage:
 #   bash tools/run_pipeline.sh [--count N] [--seed N] [--message-type TYPE] [--repo NAME]
@@ -56,6 +57,7 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 HL7_DIR="$ROOT/out/hl7"
 RDF_DIR="$ROOT/out/rdf"
+ONTOLOGY_TTL="$ROOT/rdf/ontology/hl7_fhir_tool_schema.ttl"
 STATEMENTS_URL="$GRAPHDB_BASE/repositories/$REPO/statements"
 
 # ------------------------------------------------------------------------------
@@ -112,14 +114,40 @@ if [[ "$http_status" != "204" ]]; then
     echo "       Is GraphDB running? Is repository '$REPO' correct?"
     exit 1
 fi
-echo "    Repository cleared (HTTP 204)"
+echo "    Repository cleared (HTTP $http_status)"
 
 # ------------------------------------------------------------------------------
-# step 4: load Turtle files into GraphDB
+# step 4: load the ontology TTL
+# Inference rules (e.g., hft:NumericObservation rdfs:subClassOf hft:Observation)
+# only fire if GraphDB has seen the ontology triples. Load it first, before data.
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "==> Step 4: loading $ttl_count Turtle files into GraphDB"
+echo "==> Step 4: loading ontology into GraphDB"
+
+if [[ ! -f "$ONTOLOGY_TTL" ]]; then
+    echo "ERROR: ontology file not found: $ONTOLOGY_TTL"
+    exit 1
+fi
+
+http_status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Content-Type: application/x-turtle" \
+    --data-binary "@$ONTOLOGY_TTL" \
+    "$STATEMENTS_URL")
+
+if [[ "$http_status" != "204" ]]; then
+    echo "ERROR: failed to load ontology (HTTP $http_status)"
+    exit 1
+fi
+echo "    Ontology loaded (HTTP $http_status)"
+
+# ------------------------------------------------------------------------------
+# step 5: load data Turtle files into GraphDB
+# ------------------------------------------------------------------------------
+
+echo ""
+echo "==> Step 5: loading $ttl_count data Turtle files into GraphDB"
 
 loaded=0
 failed=0

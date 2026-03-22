@@ -592,11 +592,17 @@ The generator is deterministic under a fixed seed and does not create any FHIR o
 ## End-to-End Pipeline
 
 `tools/run_pipeline.sh` runs the full pipeline in one command: generates synthetic HL7
-messages, transforms each to RDF/Turtle, clears the GraphDB repository, and loads all
-Turtle files.
+messages, transforms each to RDF/Turtle, clears the GraphDB repository, loads the
+ontology, and loads all data Turtle files.
+
+The ontology (`rdf/ontology/hl7_fhir_tool_schema.ttl`) is loaded before the data on
+every run. This is required for RDFS inference to work correctly -- without it, subclass
+relationships like `hft:NumericObservation rdfs:subClassOf hft:Observation` are invisible
+to GraphDB and queries against `hft:Observation` return no results.
 
 **Prerequisites:**
 - GraphDB running at `localhost:7200` with a repository named `hl7_fhir`
+- Repository ruleset set to `rdfs-plus-optimized` (or any RDFS ruleset)
 - `hl7_fhir_env` conda environment active
 - Run from the project root
 
@@ -637,7 +643,10 @@ Generated 100 messages in out/hl7
 ==> Step 3: clearing GraphDB repository 'hl7_fhir' at http://localhost:7200
     Repository cleared (HTTP 204)
 
-==> Step 4: loading 100 Turtle files into GraphDB
+==> Step 4: loading ontology into GraphDB
+    Ontology loaded (HTTP 204)
+
+==> Step 5: loading 100 data Turtle files into GraphDB
     Loaded: 100  Failed: 0
 
 ==> Pipeline complete
@@ -652,7 +661,9 @@ Open GraphDB Workbench to explore:
 
 Generated files land in `out/hl7/` (HL7 messages) and `out/rdf/` (Turtle files). Both
 directories are overwritten on each run. A 100-message mixed corpus produces approximately
-998 RDF triples in GraphDB.
+998 data triples plus 252 ontology triples, for roughly 1,778 total statements in GraphDB
+(including inferred triples from the RDFS ruleset). Your numbers may vary depending on whether 
+you have inference turned on in your GraphDB and which ruleset your GraphDB uses.
 
 ---
 
@@ -689,7 +700,7 @@ This project is an evolving prototype interoperability toolkit, positioned at th
 - Healthcare standards mastery: HL7 v2 messaging, FHIR resource modeling, LOINC for labs, ICD-10 for diagnoses.
 - Data transformation and normalization: Converting brittle HL7 v2 feeds into structured, FHIR-compliant resources.
 - Knowledge graph readiness: RDF serialization, SPARQL queries, and SHACL validation for advanced analytics and conformance checking.
-- End-to-end pipeline: HL7 v2 messages generated, transformed to RDF, and loaded into GraphDB via a single script. A 100-message mixed corpus produces 998 RDF triples.
+- End-to-end pipeline: HL7 v2 messages generated, transformed to RDF, and loaded into GraphDB via a single script. A 100-message mixed corpus produces 998 data triples plus 252 ontology triples, totaling approximately 1,778 statements with RDFS inference (again, depending on whether you have inference turned on and which inference engine if any you are using),
 - Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design.
 
 This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.
