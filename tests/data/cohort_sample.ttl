@@ -1,4 +1,4 @@
-@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix hft:  <https://w3id.org/shaolinpat/hft#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 
 hft:Patient_p1001 a hft:Patient ;

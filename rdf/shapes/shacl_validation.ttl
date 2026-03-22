@@ -1,6 +1,6 @@
 @prefix sh:   <http://www.w3.org/ns/shacl#> .
 @prefix fhir: <http://hl7.org/fhir/> .
-@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix hft:  <https://w3id.org/shaolinpat/hft#> .
 
 hft:AnythingWithSubjectMustHaveTwoShape
   a sh:NodeShape ;

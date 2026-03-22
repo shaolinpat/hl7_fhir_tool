@@ -60,7 +60,7 @@ def _validate(data_rel, shapes=SHAPES):
         (
             None,
             RDF.type,
-            URIRef("http://example.org/hl7-fhir-tool#AdministrativeGenderCode"),
+            URIRef("https://w3id.org/shaolinpat/hft#AdministrativeGenderCode"),
         )
     ):
         print(s, "is a AdministrativeGenderCode")

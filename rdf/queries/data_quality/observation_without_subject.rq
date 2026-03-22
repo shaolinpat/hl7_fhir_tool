@@ -1,4 +1,4 @@
-PREFIX hft: <http://example.org/hl7-fhir-tool#>
+PREFIX hft: <https://w3id.org/shaolinpat/hft#>
 
 SELECT ?observation WHERE {
     ?observation a hft:Observation .

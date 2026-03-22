@@ -31,7 +31,7 @@ from rdflib.namespace import RDFS
 # namespaces
 # ------------------------------------------------------------------------------
 
-HFT = Namespace("http://example.org/hl7-fhir-tool#")
+HFT = Namespace("https://w3id.org/shaolinpat/hft#")
 FHIR = Namespace("http://hl7.org/fhir/")
 
 # FHIR gender string -> hft: named individual

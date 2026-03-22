@@ -1,4 +1,4 @@
-PREFIX hft: <http://example.org/hl7-fhir-tool#>
+PREFIX hft: <https://w3id.org/shaolinpat/hft#>
 
 SELECT ?diagnostic_report WHERE {
     ?diagnostic_report a hft:DiagnosticReport .

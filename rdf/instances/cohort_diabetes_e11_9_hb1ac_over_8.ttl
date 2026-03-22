@@ -1,4 +1,4 @@
-@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix hft:  <https://w3id.org/shaolinpat/hft#> .
 @prefix exi:   <http://example.org/hl7-fhir/i/> .  # instances
 @prefix loinc: <http://loinc.org/> .
 @prefix icd10: <http://hl7.org/fhir/sid/icd-10-cm/> .

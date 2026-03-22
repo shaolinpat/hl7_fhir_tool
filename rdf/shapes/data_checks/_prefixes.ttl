@@ -3,8 +3,8 @@
 @prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
 
-@prefix :       <http://example.org/hl7-fhir-tool#> .
-@prefix hft:    <http://example.org/hl7-fhir-tool#> .
+@prefix :       <https://w3id.org/shaolinpat/hft#> .
+@prefix hft:    <https://w3id.org/shaolinpat/hft#> .
 @prefix fhir:   <http://hl7.org/fhir/> .
 @prefix icd10:  <http://hl7.org/fhir/sid/icd-10-cm/> .
 @prefix loinc:  <http://loinc.org/> .

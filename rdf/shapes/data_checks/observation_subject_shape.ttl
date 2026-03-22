@@ -1,6 +1,6 @@
 @prefix sh:     <http://www.w3.org/ns/shacl#> .
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
-@prefix hft:  <http://example.org/hl7-fhir-tool#> .
+@prefix hft:  <https://w3id.org/shaolinpat/hft#> .
 @prefix loinc:  <http://loinc.org/> .
 
 hft:ObservationSubjectAndCodeShape
