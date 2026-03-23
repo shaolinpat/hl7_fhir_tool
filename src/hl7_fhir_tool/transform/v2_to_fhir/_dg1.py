@@ -134,7 +134,7 @@ def _dg1_er7_lines(msg: object) -> list[str]:
         return []
 
 
-def _find_dg1_segments(msg: object) -> list:
+def _find_dg1_segments(msg: object) -> list[object]:
     """
     Return all DG1 segment objects from the message.
 

@@ -1,7 +1,7 @@
 @prefix hft:  <https://w3id.org/shaolinpat/hft#> .
-@prefix exi:   <http://example.org/hl7-fhir/i/> .  # instances
+@prefix exi:   <https://w3id.org/shaolinpat/hft/instances/> .
 @prefix loinc: <http://loinc.org/> .
-@prefix icd10: <http://hl7.org/fhir/sid/icd-10-cm/> .
+@prefix icd10: <http://hl7.org/fhir/sid/icd-10/> .
 @prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
 
 ################################################################################

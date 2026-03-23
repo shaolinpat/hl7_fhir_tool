@@ -2,7 +2,6 @@
 @prefix hft:  <https://w3id.org/shaolinpat/hft#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix xml:  <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix fhir: <http://hl7.org/fhir/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -83,16 +82,11 @@ hft:hasCode rdf:type owl:ObjectProperty ;
             rdfs:domain [ rdf:type owl:Class ;
                           owl:unionOf ( hft:Condition
                                         hft:Observation
+                                        hft:ServiceRequest
                                       )
                         ] ;
-            rdfs:range [ rdf:type owl:Class ;
-                         owl:unionOf ( hft:Condition
-                                       hft:Observation
-                                       <http://loinc.org/>
-                                       <http://hl7.org/fhir/sid/icd-10/>
-                                     )
-                       ] ;
-            rdfs:comment "Links an Observation or Condition to its concept code IRI. Code IRIs are formed as {system}/{code}, e.g., http://loinc.org/4548-4 or http://hl7.org/fhir/sid/icd-10/E11.9." ;
+            rdfs:range rdfs:Resource ;
+            rdfs:comment "Links an Observation, Condition, or ServiceRequest to its concept code IRI. Code IRIs follow the pattern {system}/{code}, e.g., http://loinc.org/4548-4 or http://hl7.org/fhir/sid/icd-10/E11.9." ;
             rdfs:label "has code" .
 
 

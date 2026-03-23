@@ -5,8 +5,7 @@ Tests for hl7_fhir_tool/rdf_serializer.
 
 import types
 
-import pytest
-from rdflib import Graph, Literal, Namespace, RDF, URIRef, XSD
+from rdflib import Graph, Literal, RDF, URIRef, XSD
 
 from hl7_fhir_tool.rdf_serializer import (
     HFT,
@@ -281,7 +280,7 @@ def test_add_patient_multiple_given_names():
         birthDate=None,
         gender=None,
     )
-    subj = _add_patient(g, resource)
+    _add_patient(g, resource)
     given_vals = {str(o) for s, p, o in g if p == HFT.given}
     assert given_vals == {"Alice", "Marie"}
 

@@ -6,5 +6,5 @@
 @prefix :       <https://w3id.org/shaolinpat/hft#> .
 @prefix hft:    <https://w3id.org/shaolinpat/hft#> .
 @prefix fhir:   <http://hl7.org/fhir/> .
-@prefix icd10:  <http://hl7.org/fhir/sid/icd-10-cm/> .
+@prefix icd10:  <http://hl7.org/fhir/sid/icd-10/> .
 @prefix loinc:  <http://loinc.org/> .

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from rdflib import Graph, Literal, Namespace, RDF, URIRef, XSD
 from rdflib.namespace import RDFS
@@ -531,7 +531,7 @@ _HANDLERS = {
 
 
 def serialize_resources(
-    resources: Iterable,
+    resources: Iterable[Any],
     graph: Optional[Graph] = None,
 ) -> Graph:
     """

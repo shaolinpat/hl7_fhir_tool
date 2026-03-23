@@ -5,7 +5,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipeline. HL7 v2 messages (ADT, ORM, ORU) are transformed into linked FHIR resources -- Patient, Encounter, Condition, ServiceRequest, Observation, DiagnosticReport -- with ICD-10 and LOINC code bindings. These FHIR resources are then serialized into RDF/Turtle, forming a coherent graph that supports SHACL-based data quality validation and SPARQL cohort queries. The result is a full proof-of-concept showing how legacy HL7 feeds can be normalized into FHIR and elevated into a semantic data layer suitable for analytics, reasoning, and deployment in a graph database such as GraphDB or Apache Jena.
+This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipeline. HL7 v2 messages (ADT, ORM, ORU) are transformed into FHIR Bundles -- containing Patient, Encounter, Condition, ServiceRequest, Observation, and DiagnosticReport resources with ICD-10 and LOINC code bindings. Those FHIR Bundles are then serialized into RDF/Turtle using a published OWL ontology (`https://w3id.org/shaolinpat/hft#`), forming a coherent graph that supports SHACL-based data quality validation and SPARQL cohort queries. The result is a full proof-of-concept showing how legacy HL7 feeds can be normalized into FHIR and elevated into a semantic data layer suitable for analytics, reasoning, and deployment in a graph database such as GraphDB or Apache Jena.
 
 ---
 
@@ -28,7 +28,8 @@ This project demonstrates a complete HL7 -> FHIR -> RDF interoperability pipelin
     - [ORM^O01 (Order)](#ormo01-order)
     - [ORU^R01 (Observation Result)](#orur01-observation-result)
     - [List supported events](#list-supported-events)
-  - [Serialize FHIR -> RDF](#serialize-fhir---rdf)
+  - [Serialize HL7 -> FHIR Bundle JSON](#serialize-hl7---fhir-bundle-json)
+  - [Serialize FHIR Bundle JSON -> RDF](#serialize-fhir-bundle-json---rdf)
 - [HL7 Stream Generator](#hl7-stream-generator)
 - [End-to-End Pipeline](#end-to-end-pipeline)
 - [Development](#development)
@@ -106,9 +107,11 @@ It also shows RDF/SPARQL/SHACL and (yet to be implemented) Java integration laye
 - Parse FHIR JSON or XML (using [`fhir.resources`](https://github.com/nazrulworld/fhir.resources))
 - Transform HL7 v2 -> FHIR resource structures (ADT^A01/A03/A08, ORM^O01, ORU^R01)
 - DG1 segment parsing -> FHIR Condition resources with ICD-10 code bindings (ADT^A01/A03/A08)
-- Serialize FHIR resources -> RDF/Turtle using a custom OWL ontology (hft: namespace, rdfs:subClassOf fhir:)
+- Two-stage pipeline: `to-fhir` serializes HL7 -> FHIR Bundle JSON; `to-rdf` serializes FHIR Bundle JSON -> RDF/Turtle
+- RDF serialization uses a published OWL ontology (`https://w3id.org/shaolinpat/hft#`, `rdfs:subClassOf fhir:`)
+- Encounter-to-Condition linking via `hft:hasCondition` enables cohort SPARQL queries
 - Load RDF output into GraphDB and run SPARQL cohort queries
-- Single-command end-to-end pipeline: generate HL7 -> RDF -> GraphDB via `tools/run_pipeline.sh`
+- Single-command end-to-end pipeline: generate HL7 -> FHIR Bundle -> RDF -> GraphDB via `tools/run_pipeline.sh`
 - Minimal, production-style CLI for batch and file-level workflows
 - 100% pytest coverage with CI/CD via GitHub Actions and Codecov
 
@@ -203,7 +206,19 @@ _Output:_
 
 {
   "resourceType": "Encounter",
-  "status": "in-progress"
+  "id": "enc-12345",
+  "status": "in-progress",
+  "class": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "IMP",
+          "display": "inpatient encounter"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -235,12 +250,33 @@ _Output:_
 
 {
   "resourceType": "Encounter",
-  "status": "in-progress"
+  "id": "enc-12345",
+  "status": "in-progress",
+  "class": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "IMP",
+          "display": "inpatient encounter"
+        }
+      ]
+    }
+  ]
 }
 
 {
   "resourceType": "Condition",
   "id": "cond-12345-1",
+  "clinicalStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+        "code": "active",
+        "display": "Active"
+      }
+    ]
+  },
   "code": {
     "coding": [
       {
@@ -281,46 +317,15 @@ _Output:_
   "resourceType": "Encounter",
   "id": "enc-12345",
   "status": "finished",
-  "class": {
-    "coding": [
-      {
-        "code": "I"
-      }
-    ]
-  }
-}
-```
-
-_With encounter period:_
-```bash
-python -m src.hl7_fhir_tool.cli transform tests/data/adt_a03_with_period.hl7 --stdout --pretty
-```
-_Output:_
-```json
-{
-  "resourceType": "Patient",
-  "id": "77777",
-  "name": [
+  "class": [
     {
-      "family": "Alpha",
-      "given": [
-        "Test"
+      "coding": [
+        {
+          "code": "I"
+        }
       ]
     }
   ]
-}
-
-{
-  "resourceType": "Encounter",
-  "id": "enc-77777",
-  "status": "finished",
-  "class": {
-    "coding": [
-      {
-        "code": "I"
-      }
-    ]
-  }
 }
 ```
 
@@ -363,53 +368,6 @@ _Output:_
 }
 ```
 
-_With OBR-driven code (e.g., OBR-4):_
-```bash
-python -m src.hl7_fhir_tool.cli transform tests/data/orm_o01_glu.hl7 --stdout --pretty
-```
-_Output:_
-```json
-{
-  "resourceType": "Patient",
-  "id": "12345",
-  "name": [
-    {
-      "family": "Doe",
-      "given": [
-        "John"
-      ]
-    }
-  ],
-  "gender": "male",
-  "birthDate": "1970-01-01"
-}
-
-{
-  "resourceType": "ServiceRequest",
-  "id": "ORD123",
-  "identifier": [
-    {
-      "value": "ORD123"
-    }
-  ],
-  "status": "active",
-  "intent": "order",
-  "code": {
-    "concept": {
-      "coding": [
-        {
-          "code": "GLU"
-        }
-      ],
-      "text": "Glucose"
-    }
-  },
-  "subject": {
-    "reference": "Patient/12345"
-  }
-}
-```
-
 _Mapping notes:_
 - **ORC-2/ORC-3** -> `ServiceRequest.identifier` (placer/filler numbers)
 - **ORC-5** (order status) -> `ServiceRequest.status` (e.g., `NW` -> `active`, `CA` -> `revoked`, `CM` -> `completed`)
@@ -442,14 +400,6 @@ _Output:_
 {
   "resourceType": "Observation",
   "id": "obs-P12345-1",
-  "identifier": [
-    {
-      "value": "1234"
-    },
-    {
-      "value": "5678"
-    }
-  ],
   "status": "final",
   "code": {
     "coding": [
@@ -491,59 +441,57 @@ Registered HL7 v2 -> FHIR events:
     ORU^R01
 ```
 
-### Serialize FHIR -> RDF
+### Serialize HL7 -> FHIR Bundle JSON
 
-The `to-rdf` command runs the full HL7 -> FHIR -> RDF pipeline in one step and writes a Turtle file.
+`to-fhir` is stage 1 of the two-stage pipeline. It transforms an HL7 v2 message into a
+FHIR Bundle (type: collection) and writes it to disk as JSON. The Bundle contains one
+entry per resource produced by the transformer.
 
 ```bash
-python -m src.hl7_fhir_tool.cli to-rdf tests/data/oru_r01_min.hl7 --output-dir out/
+python -m src.hl7_fhir_tool.cli to-fhir tests/data/adt_a01_with_dg1.hl7 --output-dir out/fhir/
 ```
 _Output:_
 ```
-Wrote out/oru_r01_min.ttl  (12 triples)
+Wrote out/fhir/adt_a01_with_dg1.json (3 resources)
+```
+
+Write to stdout:
+```bash
+python -m src.hl7_fhir_tool.cli to-fhir tests/data/adt_a01_with_dg1.hl7 --stdout --pretty
+```
+
+### Serialize FHIR Bundle JSON -> RDF
+
+`to-rdf` is stage 2 of the two-stage pipeline. It accepts either a FHIR Bundle `.json`
+file produced by `to-fhir` (stage 2) or an HL7 `.hl7` file directly (single-stage).
+
+_Stage 2 (from FHIR Bundle):_
+```bash
+python -m src.hl7_fhir_tool.cli to-rdf out/fhir/adt_a01_with_dg1.json --output-dir out/rdf/
+```
+_Output:_
+```
+Wrote out/rdf/adt_a01_with_dg1.ttl (13 triples)
+```
+
+_Single-stage (from HL7 directly):_
+```bash
+python -m src.hl7_fhir_tool.cli to-rdf tests/data/adt_a01_with_dg1.hl7 --output-dir out/rdf/
 ```
 
 _Sample Turtle output:_
 ```turtle
-@prefix hft: <http://example.org/hl7-fhir-tool#> .
+@prefix hft: <https://w3id.org/shaolinpat/hft#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-hft:Observation_obs-P12345-1 a hft:NumericObservation ;
-    hft:hasCode <http://example.org/code/GLU> ;
-    hft:hasUnit "mg/dL"^^xsd:string ;
-    hft:identifier "1234"^^xsd:string,
-        "5678"^^xsd:string ;
-    hft:observationSubject hft:Patient_P12345 ;
-    hft:status "final"^^xsd:string ;
-    hft:valueDecimal 110.0 .
-
-hft:Patient_P12345 a hft:Patient ;
-    hft:birthDate "1983-05-14"^^xsd:date ;
-    hft:family "Doe"^^xsd:string ;
-    hft:gender hft:female ;
-    hft:given "Jane"^^xsd:string .
-```
-
-_ADT^A01 with DG1 (ICD-10 diagnosis):_
-```bash
-python -m src.hl7_fhir_tool.cli to-rdf tests/data/adt_a01_with_dg1.hl7 --output-dir out/
-```
-_Output:_
-```
-Wrote out/adt_a01_with_dg1.ttl  (11 triples)
-```
-
-_Turtle output:_
-```turtle
-@prefix hft: <http://example.org/hl7-fhir-tool#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+hft:Encounter_enc-12345 a hft:Encounter ;
+    hft:encounterSubject hft:Patient_12345 ;
+    hft:hasCondition hft:Condition_cond-12345-1 ;
+    hft:status "in-progress"^^xsd:string .
 
 hft:Condition_cond-12345-1 a hft:Condition ;
     hft:conditionSubject hft:Patient_12345 ;
     hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
-
-hft:Encounter_unknown a hft:Encounter ;
-    hft:status "in-progress"^^xsd:string .
 
 hft:Patient_12345 a hft:Patient ;
     hft:birthDate "1970-01-01"^^xsd:date ;
@@ -553,50 +501,60 @@ hft:Patient_12345 a hft:Patient ;
     hft:identifier "12345"^^xsd:string .
 ```
 
-Each hft: class declares `rdfs:subClassOf` its canonical fhir: counterpart, making the hft: namespace an extension of FHIR rather than a parallel vocabulary. Queries and reasoners operating on fhir: terms will pick up hft: individuals through the subclass link.
+Each `hft:` class declares `rdfs:subClassOf` its canonical `fhir:` counterpart, making
+the `hft:` namespace an extension of FHIR rather than a parallel vocabulary. The ontology
+is published at `https://w3id.org/shaolinpat/hft#`.
 
 Write to stdout instead of a file:
 
 ```bash
-python -m src.hl7_fhir_tool.cli to-rdf tests/data/oru_r01_min.hl7 --stdout
+python -m src.hl7_fhir_tool.cli to-rdf out/fhir/adt_a01_with_dg1.json --stdout
 ```
 
 ---
 
 ## HL7 Stream Generator
 
-A synthetic HL7 v2.5.1 generator is included for producing realistic test streams for all supported message types (ADT^A01, ADT^A03, ADT^A08, ORM^O01, ORU^R01).  
-It generates pure HL7 messages and can output:
+A synthetic HL7 v2.5.1 generator is included for producing realistic test streams for all
+supported message types (ADT^A01, ADT^A03, ADT^A08, ORM^O01, ORU^R01).
 
-- Individual `.hl7` files (one per message)
-- A single concatenated HL7 stream file for ingestion into the transformation pipeline
+ADT messages (A01, A03, A08) include a `DG1` segment with a randomly selected ICD-10 code
+drawn from a built-in pool of eight common diagnoses.
 
-ADT messages (A01, A03, A08) include a `DG1` segment with a randomly selected ICD-10 code drawn from a built-in pool of eight common diagnoses. ORM and ORU messages do not include DG1.
+In `mixed_registered` mode the generator guarantees a diabetic cohort: the first 20 message
+slots produce 10 paired ADT^A01 (E11.9) + ORU^R01 (LOINC 4548-4, HbA1c > 8.0) messages
+sharing the same MRN. This ensures the cohort SPARQL query returns results regardless of
+total message count.
 
-Example (300-message mixed stream):
+Example (100-message mixed stream):
 
 ```bash
 python scripts/generate_hl7_adt_a01_bulk.py \
-    --count 300 \
+    --count 100 \
     --message-type mixed_registered \
-    --out tests/data/bulk_mixed_300 \
-    --stream-file tests/data/hl7_stream/mixed_300.hl7 \
+    --out out/hl7 \
     --seed 22 \
     --line-endings cr
 ```
 
-The generator is deterministic under a fixed seed and does not create any FHIR or RDF output; it is used solely for producing input for the transformation layer.
+The generator is deterministic under a fixed seed and produces only HL7 input for the
+transformation layer.
 
 ---
 
 ## End-to-End Pipeline
 
-`tools/run_pipeline.sh` runs the full pipeline in one command: generates synthetic HL7
-messages, transforms each to RDF/Turtle, clears the GraphDB repository, loads the
-ontology, and loads all data Turtle files.
+`tools/run_pipeline.sh` runs the full pipeline in one command:
 
-The ontology (`rdf/ontology/hl7_fhir_tool_schema.ttl`) is loaded before the data on
-every run. This is required for RDFS inference to work correctly -- without it, subclass
+1. Generate synthetic HL7 messages
+2. Transform each HL7 message to a FHIR Bundle JSON (`to-fhir`)
+3. Transform each FHIR Bundle JSON to RDF/Turtle (`to-rdf`)
+4. Clear the GraphDB repository
+5. Load the ontology TTL (required for RDFS inference)
+6. Load all data Turtle files into GraphDB
+
+The ontology (`rdf/ontology/hl7_fhir_tool_schema.ttl`) is loaded before the data on every
+run. This is required for RDFS inference to work correctly -- without it, subclass
 relationships like `hft:NumericObservation rdfs:subClassOf hft:Observation` are invisible
 to GraphDB and queries against `hft:Observation` return no results.
 
@@ -637,33 +595,34 @@ bash tools/run_pipeline.sh \
 ==> Step 1: generating 100 HL7 messages (type=mixed_registered, seed=22)
 Generated 100 messages in out/hl7
 
-==> Step 2: transforming HL7 -> RDF/Turtle
+==> Step 2: transforming HL7 -> FHIR Bundle JSON
     Transformed: 100  Skipped/failed: 0
 
-==> Step 3: clearing GraphDB repository 'hl7_fhir' at http://localhost:7200
+==> Step 3: transforming FHIR Bundle JSON -> RDF/Turtle
+    Transformed: 100  Skipped/failed: 0
+
+==> Step 4: clearing GraphDB repository 'hl7_fhir' at http://localhost:7200
     Repository cleared (HTTP 204)
 
-==> Step 4: loading ontology into GraphDB
+==> Step 5: loading ontology into GraphDB
     Ontology loaded (HTTP 204)
 
-==> Step 5: loading 100 data Turtle files into GraphDB
+==> Step 6: loading 100 data Turtle files into GraphDB
     Loaded: 100  Failed: 0
 
 ==> Pipeline complete
-    HL7 messages : 100
-    TTL files    : 100
-    Loaded       : 100
-    Repository   : hl7_fhir @ http://localhost:7200
+    HL7 messages      : 100
+    FHIR Bundle files : 100
+    TTL files         : 100
+    Loaded            : 100
+    Repository        : hl7_fhir @ http://localhost:7200
 
 Open GraphDB Workbench to explore:
     http://localhost:7200/sparql
 ```
 
-Generated files land in `out/hl7/` (HL7 messages) and `out/rdf/` (Turtle files). Both
-directories are overwritten on each run. A 100-message mixed corpus produces approximately
-998 data triples plus 252 ontology triples, for roughly 1,778 total statements in GraphDB
-(including inferred triples from the RDFS ruleset). Your numbers may vary depending on whether 
-you have inference turned on in your GraphDB and which ruleset your GraphDB uses.
+Generated files land in `out/hl7/` (HL7 messages), `out/fhir/` (FHIR Bundle JSON), and
+`out/rdf/` (Turtle files). All three directories are overwritten on each run.
 
 ---
 
@@ -681,6 +640,7 @@ Static analysis and linting:
 ruff check src tests
 mypy
 ```
+> **Note:** `ruff` passes cleanly. `mypy` reports type annotation warnings on internal helper functions in `rdf_serializer.py`; these are tracked and do not affect runtime behavior.
 
 ---
 
@@ -695,30 +655,37 @@ Badges are displayed at the top of this file.
 
 ## Status
 
-This project is an evolving prototype interoperability toolkit, positioned at the intersection of healthcare standards and modern data engineering. It is not a production system, but it demonstrates:
+This project is an evolving prototype interoperability toolkit, positioned at the
+intersection of healthcare standards and modern data engineering. It is not a production
+system, but it demonstrates:
 
-- Healthcare standards mastery: HL7 v2 messaging, FHIR resource modeling, LOINC for labs, ICD-10 for diagnoses.
-- Data transformation and normalization: Converting brittle HL7 v2 feeds into structured, FHIR-compliant resources.
-- Knowledge graph readiness: RDF serialization, SPARQL queries, and SHACL validation for advanced analytics and conformance checking.
-- End-to-end pipeline: HL7 v2 messages generated, transformed to RDF, and loaded into GraphDB via a single script. A 100-message mixed corpus produces 998 data triples plus 252 ontology triples, totaling approximately 1,778 statements with RDFS inference (again, depending on whether you have inference turned on and which inference engine if any you are using),
-- Engineering practices: CI/CD, full test coverage, typed Python, modular CLI design.
+- Healthcare standards mastery: HL7 v2 messaging, FHIR R5 resource modeling, LOINC for labs, ICD-10 for diagnoses.
+- Data transformation and normalization: Converting brittle HL7 v2 feeds into validated FHIR Bundles before RDF serialization.
+- Knowledge graph readiness: OWL ontology with published namespace, RDF serialization, SPARQL cohort queries, and SHACL validation.
+- End-to-end pipeline: HL7 v2 messages generated, transformed to FHIR Bundle JSON, serialized to RDF/Turtle, and loaded into GraphDB via a single script.
+- Engineering practices: CI/CD, 100% test coverage, typed Python, modular CLI design.
 
-This tool is intended as a portfolio-quality demonstration of interoperability skills and engineering rigor. While not validated for clinical deployment, it showcases the foundations required to build scalable, standards-based healthcare data pipelines.
+This tool is intended as a portfolio-quality demonstration of interoperability skills and
+engineering rigor. While not validated for clinical deployment, it showcases the foundations
+required to build scalable, standards-based healthcare data pipelines.
 
 ---
 
 ## Ontology Model
 
-The **ontology** defines the RDF model that underpins HL7 -> FHIR transformations.  
-It lives in `rdf/ontology/hl7_fhir_tool_schema.ttl` and includes:
+The ontology defines the RDF model that underpins the FHIR -> RDF serialization step.
+It is published at `https://w3id.org/shaolinpat/hft#` and lives in
+`rdf/ontology/hl7_fhir_tool_schema.ttl`.
 
-- **Core classes:** `Patient`, `Encounter`, `Observation`, `Condition`, `ServiceRequest`, and `DiagnosticReport`  
-- **Object properties:** `hasSubject`, `hasCode`, `hasPart`, `basedOn`, etc.  
-- **Data properties:** `identifier`, `birthDate`, `status`, `valueDecimal`, and related attributes  
+Key design decisions:
 
-Each hft: class declares `rdfs:subClassOf` its canonical fhir: counterpart. This alignment makes hft: an extension of FHIR rather than a parallel vocabulary -- queries and reasoners operating on fhir: terms will pick up hft: individuals through the subclass link.
+- **Namespace**: `https://w3id.org/shaolinpat/hft#` -- a persistent, dereferenceable URI via the W3C Permanent Identifier service.
+- **FHIR alignment**: Every `hft:` class declares `rdfs:subClassOf` its canonical `fhir:` counterpart (e.g., `hft:Patient rdfs:subClassOf fhir:Patient`). Every `hft:` object property declares `rdfs:subPropertyOf` its `fhir:` counterpart where applicable. FHIR stub declarations carry `rdfs:isDefinedBy <http://hl7.org/fhir/>`.
+- **Ontology metadata**: `dct:title`, `dct:creator`, `owl:versionInfo`, `rdfs:seeAlso`, and a `rdfs:comment` explaining why `fhir.ttl` is not imported directly.
+- **`hft:hasCondition`**: Links Encounter to Condition, enabling cohort queries that join diagnosis and lab data on the same patient.
+- **Disjointness**: `owl:AllDisjointClasses` across the six core resource classes.
 
-Open it in **Protege** or **TopBraid** for exploration or editing.
+Open in Protege or TopBraid for exploration:
 
 ```bash
 protege "file://$PWD/rdf/ontology/hl7_fhir_tool_schema.ttl"
@@ -728,7 +695,8 @@ protege "file://$PWD/rdf/ontology/hl7_fhir_tool_schema.ttl"
 
 ## GraphDB Integration
 
-RDF output from the pipeline can be loaded directly into GraphDB for SPARQL querying and graph exploration.
+RDF output from the pipeline can be loaded directly into GraphDB for SPARQL querying and
+graph exploration.
 
 ### Loading data
 
@@ -736,22 +704,30 @@ RDF output from the pipeline can be loaded directly into GraphDB for SPARQL quer
 2. Switch to the new repository
 3. Import Turtle files: **Import -> RDF Files -> Upload Files**
 
+Or use the pipeline script which handles all steps automatically.
+
 ### Cohort query example
 
-The query below finds all patients with a Type 2 diabetes diagnosis (ICD-10 E11.9) who also have an HbA1c observation (LOINC 4548-4) above 8.0. It runs against `tests/data/cohort_sample.ttl`, which is included in the repo as a reference dataset.
+The query below finds all patients with a Type 2 diabetes diagnosis (ICD-10 E11.9) who also
+have an HbA1c observation (LOINC 4548-4) above 8.0. Run `bash tools/run_pipeline.sh` first
+to populate GraphDB with data that includes the diabetic cohort.
 
 ```sparql
-PREFIX hft: <http://example.org/hl7-fhir-tool#>
+PREFIX hft:   <https://w3id.org/shaolinpat/hft#>
+PREFIX loinc: <http://loinc.org/>
+PREFIX icd10: <http://hl7.org/fhir/sid/icd-10/>
+PREFIX xsd:   <http://www.w3.org/2001/XMLSchema#>
 
-SELECT ?patient ?family ?value WHERE {
-  ?patient a hft:Patient ;
-           hft:family ?family .
-  ?cond hft:conditionSubject ?patient ;
-        hft:hasCode <http://hl7.org/fhir/sid/icd-10/E11.9> .
-  ?obs hft:observationSubject ?patient ;
-       hft:hasCode <http://loinc.org/4548-4> ;
-       hft:valueDecimal ?value .
-  FILTER (?value > 8.0)
+SELECT DISTINCT ?patient WHERE {
+    ?enc a hft:Encounter ;
+         hft:encounterSubject ?patient ;
+         hft:hasCondition ?cond .
+    ?cond hft:hasCode icd10:E11.9 .
+    ?obs a hft:Observation ;
+         hft:observationSubject ?patient ;
+         hft:hasCode loinc:4548-4 .
+    { ?obs hft:valueDecimal ?v } UNION { ?obs hft:valueInteger ?vi BIND(xsd:decimal(?vi) AS ?v) }
+    FILTER(xsd:decimal(?v) > 8.0)
 }
 ```
 
@@ -761,7 +737,7 @@ SELECT ?patient ?family ?value WHERE {
 
 ## SPARQL Testing
 
-SPARQL queries verify schema consistency, data quality, and analytic cohorts.  
+SPARQL queries verify schema consistency, data quality, and analytic cohorts.
 Queries live under `rdf/queries/` and are grouped into subfolders:
 
 | Directory | Purpose |
@@ -776,22 +752,14 @@ Run all SPARQL checks using Apache Jena's **ARQ** engine:
 bash tools/run_sparql_checks.sh
 ```
 
-Example output excerpt:
-```
-== Cohorts (expect rows) ==
->>> rdf/queries/cohorts/cohort_e11_9_hba1c_over_8.rq
-?patient  ?value
-exi:Patient_p1001  "8.6"^^xsd:decimal
-```
-
-Schema and data-quality checks should return **no rows** (PASS).  
+Schema and data-quality checks should return **no rows** (PASS).
 Cohort queries should return matching instances.
 
 ---
 
 ## SHACL Testing
 
-SHACL shapes enforce structural and semantic conformance against the ontology.  
+SHACL shapes enforce structural and semantic conformance against the ontology.
 Shapes are organized under `rdf/shapes/`:
 
 | Directory | Purpose |
@@ -825,7 +793,8 @@ Warnings (sum): 0
 Result        : ALL EXPECTATIONS MET
 ```
 
-Run SHACL validation via **pySHACL** on **multiple** data files where some are marked as expected to violate. The ones that violate as expected are passes:
+Run SHACL validation via **pySHACL** on **multiple** data files where some are marked as
+expected to violate:
 
 ```bash
     python tools/run_shacl.py \
@@ -859,119 +828,7 @@ Warnings (sum): 0
 Result        : ALL EXPECTATIONS MET
 ```
 
-A run on the same shapes and data **without** `--expected-fail` produces failures:
-
-```bash
-    python tools/run_shacl.py \
-        --data \
-            tests/data/*.ttl \
-        --shapes \
-            src/hl7_fhir_tool/shacl/modules/*.ttl \
-            rdf/shapes/data_checks/*.ttl \
-            rdf/shapes/schema_checks/*.ttl
-```
-
-Expected output:
-```
---- SHACL Validation Suite --------------------------------------------
-Inference     : rdfs
-Shapes Loaded : 10
------------------------------------------------------------------------
-[  1/3] FAIL  tests/data/fhir_bad_closed.ttl
-      Details : Violations=1
-[  2/3] FAIL  tests/data/fhir_bad_values.ttl
-      Details : Violations=2
-[  3/3] PASS  tests/data/fhir_valid.ttl
------------------------------------------------------------------------
-Files Checked : 3
-Failures      : 0
-Warnings (sum): 0
-Result        : EXPECTATIONS NOT MET
-```
-
-Include `--details fail` or `--details all` for verbose output:
-
-```bash
-    python tools/run_shacl.py \
-        --data \
-            tests/data/*.ttl \
-        --shapes \
-            src/hl7_fhir_tool/shacl/modules/*.ttl \
-            rdf/shapes/data_checks/*.ttl \
-            rdf/shapes/schema_checks/*.ttl \
-        --expected-fail \
-            tests/data/fhir_bad_closed.ttl \
-            tests/data/fhir_bad_values.ttl \
-        --details all
-```
-
-Expected output:
-```
---- SHACL Validation Suite --------------------------------------------
-Inference     : rdfs
-Shapes Loaded : 10
-Expected-Fail : 2
------------------------------------------------------------------------
-[  1/3] PASS (expected violations)  tests/data/fhir_bad_closed.ttl
-      Details : Violations=1
-      ----- Validation Report (pySHACL) -----
-Validation Report
-Conforms: False
-Results (1):
-Constraint Violation in ClosedConstraintComponent (http://www.w3.org/ns/shacl#ClosedConstraintComponent):
-        Severity: sh:Violation
-        Source Shape: <http://example.org/hl7-fhir-tool#PatientClosedShape>
-        Focus Node: ex:P2
-        Value Node: Literal("oops")
-        Result Path: <http://hl7.org/fhir/unknownProp>
-        Message: Patient contains an unexpected property (closed-shape violation).
-
-      ---------------------------------------
-      Total Results : 1
-      Data File     : tests/data/fhir_bad_closed.ttl
-      Inference     : rdfs
-
-[  2/3] PASS (expected violations)  tests/data/fhir_bad_values.ttl
-      Details : Violations=2
-      ----- Validation Report (pySHACL) -----
-Validation Report
-Conforms: False
-Results (2):
-Constraint Violation in MinCountConstraintComponent (http://www.w3.org/ns/shacl#MinCountConstraintComponent):
-        Severity: sh:Violation
-        Source Shape: [ sh:message Literal("Encounter must reference a Patient (encounterSubject/subject).") ; sh:minCount Literal("1", datatype=xsd:integer) ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#encounterSubject> <http://hl7.org/fhir/subject> ) ] ; sh:severity sh:Violation ]
-        Focus Node: ex:E2
-        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#encounterSubject> <http://hl7.org/fhir/subject> ) ]
-        Message: Encounter must reference a Patient (encounterSubject/subject).
-Constraint Violation in InConstraintComponent (http://www.w3.org/ns/shacl#InConstraintComponent):
-        Severity: sh:Violation
-        Source Shape: [ sh:message Literal("Status must be a permitted value for this resource.") ; sh:path [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ] ; sh:severity sh:Violation ]
-        Focus Node: ex:SR2
-        Value Node: Literal("bogus")
-        Result Path: [ sh:alternativePath ( <http://example.org/hl7-fhir-tool#status> <http://hl7.org/fhir/status> ) ]
-        Message: Status must be a permitted value for this resource.
-
-      ---------------------------------------
-      Total Results : 2
-      Data File     : tests/data/fhir_bad_values.ttl
-      Inference     : rdfs
-
-[  3/3] PASS  tests/data/fhir_valid.ttl
-      ----- Validation Report (pySHACL) -----
-Validation Report
-Conforms: True
-
-      ---------------------------------------
-      Total Results : 0
-      Data File     : tests/data/fhir_valid.ttl
-      Inference     : rdfs
-
------------------------------------------------------------------------
-Files Checked       : 3
-Failures      : 0
-Warnings (sum): 0
-Result        : ALL EXPECTATIONS MET
-```
+Include `--details fail` or `--details all` for verbose output.
 
 **Interpreting results:**
 - `ALL EXPECTATIONS MET` -> all shapes satisfied.

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import types
 
-import pytest
 
 import hl7_fhir_tool.transform.v2_to_fhir._dg1 as mod
 from hl7_fhir_tool.transform.v2_to_fhir._dg1 import (
