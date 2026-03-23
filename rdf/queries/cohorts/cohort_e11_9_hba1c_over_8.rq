@@ -1,6 +1,6 @@
 PREFIX hft:   <https://w3id.org/shaolinpat/hft#>
 PREFIX loinc: <http://loinc.org/>
-PREFIX icd10: <http://hl7.org/fhir/sid/icd-10-cm/>
+PREFIX icd10: <http://hl7.org/fhir/sid/icd-10/>
 PREFIX xsd:   <http://www.w3.org/2001/XMLSchema#>
 
 SELECT DISTINCT ?patient WHERE {

@@ -17,15 +17,16 @@ from __future__ import annotations
 
 from typing import Any, List, Optional, Tuple, cast
 
-from hl7apy.core import Message
-from fhir.resources.patient import Patient
+from fhir.resources.codeableconcept import CodeableConcept
+from fhir.resources.coding import Coding
 from fhir.resources.encounter import Encounter
+from fhir.resources.patient import Patient
 from fhir.resources.resource import Resource
+from hl7apy.core import Message
 
 from ._dg1 import build_conditions
-
-from ..registry import register
 from ..base import Transformer
+from ..registry import register
 
 # Ensure resource_type visible on instances under Pydantic v2
 try:
@@ -33,9 +34,23 @@ try:
 except Exception:
     pass
 try:
-    setattr(Encounter, "resource_typ", "Encounter")
+    setattr(Encounter, "resource_type", "Encounter")
 except Exception:
     pass
+
+# class_fhir is required by FHIR R5 Encounter. We default to "IMP" (inpatient
+# encounter) for all ADT^A01 messages, as A01 is an admit notification.
+_ENCOUNTER_CLASS = [
+    CodeableConcept(
+        coding=[
+            Coding(
+                system="http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                code="IMP",
+                display="inpatient encounter",
+            )
+        ]
+    )
+]
 
 
 # ------------------------------------------------------------------------------
@@ -96,16 +111,26 @@ class ADTA01Transformer(Transformer):
         """
         Produce a minimal Patient and Encounter from PID and PV1.
         Appends a Condition for each DG1 segment present in the message.
+
+        The Encounter id is set to enc-{patient_id} after both Patient and
+        Encounter are built, so that the RDF serializer can derive the patient
+        URI from the encounter id when no subject reference is present.
         """
         # Accept either uppercase (segment objects) or lowercase (hl7apy proxies)
         patient = self._build_patient(getattr(msg, "PID", getattr(msg, "pid", None)))
         encounter = self._build_encounter(
             getattr(msg, "PV1", getattr(msg, "pv1", None))
         )
+
+        # Set encounter id using patient id so the RDF serializer can link them.
+        patient_id = getattr(patient, "id", None) or "unknown"
+        try:
+            encounter.id = f"enc-{patient_id}"
+        except Exception:
+            pass
+
         resources: List[Resource] = [patient, encounter]
-        resources.extend(
-            build_conditions(msg, getattr(patient, "id", None) or "unknown")
-        )
+        resources.extend(build_conditions(msg, patient_id))
         return resources
 
     # --------------------------------------------------------------------------
@@ -159,6 +184,9 @@ class ADTA01Transformer(Transformer):
     def _build_encounter(pv1: Any) -> Encounter:
         """
         Create a lenient Encounter from PV1.
+
+        Note: encounter.id is set by transform() after the patient id is known,
+        following the enc-{patient_id} convention used by the RDF serializer.
         """
         # Pydantic v2 first, fallback to v1
         try:
@@ -175,6 +203,9 @@ class ADTA01Transformer(Transformer):
         except Exception:
             # Stay silent; keep encounter skeleton
             pass
+
+        # class_fhir is required by FHIR R5 Encounter.
+        enc.class_fhir = _ENCOUNTER_CLASS
 
         return enc
 

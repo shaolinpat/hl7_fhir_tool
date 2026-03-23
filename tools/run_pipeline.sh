@@ -3,10 +3,11 @@
 #
 # Full end-to-end pipeline:
 #   1. Generate synthetic HL7 v2.5.1 messages
-#   2. Transform each message to RDF/Turtle via the to-rdf CLI
-#   3. Clear the GraphDB repository
-#   4. Load the ontology TTL (required for RDFS inference)
-#   5. Load all data Turtle files into GraphDB
+#   2. Transform each HL7 message to a FHIR Bundle JSON (to-fhir)
+#   3. Transform each FHIR Bundle JSON to RDF/Turtle (to-rdf)
+#   4. Clear the GraphDB repository
+#   5. Load the ontology TTL (required for RDFS inference)
+#   6. Load all data Turtle files into GraphDB
 #
 # Usage:
 #   bash tools/run_pipeline.sh [--count N] [--seed N] [--message-type TYPE] [--repo NAME]
@@ -56,6 +57,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 HL7_DIR="$ROOT/out/hl7"
+FHIR_DIR="$ROOT/out/fhir"
 RDF_DIR="$ROOT/out/rdf"
 ONTOLOGY_TTL="$ROOT/rdf/ontology/hl7_fhir_tool_schema.ttl"
 STATEMENTS_URL="$GRAPHDB_BASE/repositories/$REPO/statements"
@@ -74,24 +76,50 @@ python "$ROOT/scripts/generate_hl7_adt_a01_bulk.py" \
     --seed "$SEED"
 
 # ------------------------------------------------------------------------------
-# step 2: transform each .hl7 file to RDF/Turtle
+# step 2: transform each .hl7 file to a FHIR Bundle JSON (stage 1 of pipeline)
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "==> Step 2: transforming HL7 -> RDF/Turtle"
-mkdir -p "$RDF_DIR"
+echo "==> Step 2: transforming HL7 -> FHIR Bundle JSON"
+mkdir -p "$FHIR_DIR"
 
-success=0
-skipped=0
+fhir_success=0
+fhir_skipped=0
 for hl7_file in "$HL7_DIR"/*.hl7; do
-    result=$(python -m src.hl7_fhir_tool.cli to-rdf "$hl7_file" --output-dir "$RDF_DIR" 2>&1) || true
+    result=$(python -m src.hl7_fhir_tool.cli to-fhir "$hl7_file" --output-dir "$FHIR_DIR" 2>&1) || true
     if echo "$result" | grep -q "Wrote"; then
-        success=$((success + 1))
+        fhir_success=$((fhir_success + 1))
     else
-        skipped=$((skipped + 1))
+        fhir_skipped=$((fhir_skipped + 1))
     fi
 done
-echo "    Transformed: $success  Skipped/failed: $skipped"
+echo "    Transformed: $fhir_success  Skipped/failed: $fhir_skipped"
+
+fhir_count=$(ls "$FHIR_DIR"/*.json 2>/dev/null | wc -l)
+if [[ "$fhir_count" -eq 0 ]]; then
+    echo "ERROR: no FHIR Bundle JSON files produced in $FHIR_DIR -- aborting."
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# step 3: transform each FHIR Bundle JSON to RDF/Turtle (stage 2 of pipeline)
+# ------------------------------------------------------------------------------
+
+echo ""
+echo "==> Step 3: transforming FHIR Bundle JSON -> RDF/Turtle"
+mkdir -p "$RDF_DIR"
+
+rdf_success=0
+rdf_skipped=0
+for fhir_file in "$FHIR_DIR"/*.json; do
+    result=$(python -m src.hl7_fhir_tool.cli to-rdf "$fhir_file" --output-dir "$RDF_DIR" 2>&1) || true
+    if echo "$result" | grep -q "Wrote"; then
+        rdf_success=$((rdf_success + 1))
+    else
+        rdf_skipped=$((rdf_skipped + 1))
+    fi
+done
+echo "    Transformed: $rdf_success  Skipped/failed: $rdf_skipped"
 
 ttl_count=$(ls "$RDF_DIR"/*.ttl 2>/dev/null | wc -l)
 if [[ "$ttl_count" -eq 0 ]]; then
@@ -100,11 +128,11 @@ if [[ "$ttl_count" -eq 0 ]]; then
 fi
 
 # ------------------------------------------------------------------------------
-# step 3: clear the GraphDB repository
+# step 4: clear the GraphDB repository
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "==> Step 3: clearing GraphDB repository '$REPO' at $GRAPHDB_BASE"
+echo "==> Step 4: clearing GraphDB repository '$REPO' at $GRAPHDB_BASE"
 http_status=$(curl -s -o /dev/null -w "%{http_code}" \
     -X DELETE \
     "$STATEMENTS_URL")
@@ -117,13 +145,13 @@ fi
 echo "    Repository cleared (HTTP $http_status)"
 
 # ------------------------------------------------------------------------------
-# step 4: load the ontology TTL
+# step 5: load the ontology TTL
 # Inference rules (e.g., hft:NumericObservation rdfs:subClassOf hft:Observation)
 # only fire if GraphDB has seen the ontology triples. Load it first, before data.
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "==> Step 4: loading ontology into GraphDB"
+echo "==> Step 5: loading ontology into GraphDB"
 
 if [[ ! -f "$ONTOLOGY_TTL" ]]; then
     echo "ERROR: ontology file not found: $ONTOLOGY_TTL"
@@ -143,11 +171,11 @@ fi
 echo "    Ontology loaded (HTTP $http_status)"
 
 # ------------------------------------------------------------------------------
-# step 5: load data Turtle files into GraphDB
+# step 6: load data Turtle files into GraphDB
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "==> Step 5: loading $ttl_count data Turtle files into GraphDB"
+echo "==> Step 6: loading $ttl_count data Turtle files into GraphDB"
 
 loaded=0
 failed=0
@@ -174,10 +202,11 @@ echo "    Loaded: $loaded  Failed: $failed"
 
 echo ""
 echo "==> Pipeline complete"
-echo "    HL7 messages : $COUNT"
-echo "    TTL files    : $ttl_count"
-echo "    Loaded       : $loaded"
-echo "    Repository   : $REPO @ $GRAPHDB_BASE"
+echo "    HL7 messages      : $COUNT"
+echo "    FHIR Bundle files : $fhir_count"
+echo "    TTL files         : $ttl_count"
+echo "    Loaded            : $loaded"
+echo "    Repository        : $REPO @ $GRAPHDB_BASE"
 echo ""
 echo "Open GraphDB Workbench to explore:"
 echo "    $GRAPHDB_BASE/sparql"

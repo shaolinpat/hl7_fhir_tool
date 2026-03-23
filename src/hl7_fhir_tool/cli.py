@@ -16,6 +16,16 @@ transform
         - write resources to files (default), or
         - print resources to stdout (with --stdout).
 
+to-fhir
+    Transform an HL7 v2 message into a FHIR Bundle (JSON) and write to disk.
+    This is stage 1 of the two-stage pipeline:
+        HL7 v2 -> FHIR Bundle JSON -> RDF/Turtle
+
+to-rdf
+    Serialize to RDF/Turtle. Accepts either:
+        - an HL7 v2 .hl7 file (single-stage: HL7 -> RDF), or
+        - a FHIR Bundle .json file produced by to-fhir (stage 2 of pipeline).
+
 Exit codes
 ----------
 0  success
@@ -41,11 +51,17 @@ import sys
 
 from collections.abc import Mapping, Iterable as _Iterable
 from decimal import Decimal as _Decimal
+from fhir.resources.condition import Condition
+from fhir.resources.diagnosticreport import DiagnosticReport
+from fhir.resources.encounter import Encounter
+from fhir.resources.observation import Observation
+from fhir.resources.patient import Patient
+from fhir.resources.servicerequest import ServiceRequest
 from hl7apy.core import Message
 from hl7apy.parser import parse_message
 from hl7apy.validation import VALIDATION_LEVEL
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, List, Optional
 from uuid import UUID as _UUID
 
 from .config import load_config
@@ -56,11 +72,10 @@ from .logging_utils import configure_logging
 from .rdf_serializer import serialize_resources
 from .transform.registry import available_events, get_transformer
 
-# import hl7_fhir_tool.transform
 
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # globals
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 LOG = logging.getLogger("hl7_fhir_tool")
 
@@ -68,9 +83,22 @@ EXIT_OK = 0
 EXIT_ERR = 1
 EXIT_CLI = 2
 
-# -------------------------------------------------------------------------------
+# Dispatch table: FHIR resourceType string -> fhir.resources class.
+# Used by _load_resources_from_bundle_json to reconstruct resource objects from
+# a FHIR Bundle JSON file produced by the to-fhir subcommand.
+_FHIR_RESOURCE_CLASSES: dict = {
+    "Condition": Condition,
+    "DiagnosticReport": DiagnosticReport,
+    "Encounter": Encounter,
+    "Observation": Observation,
+    "Patient": Patient,
+    "ServiceRequest": ServiceRequest,
+}
+
+
+# ------------------------------------------------------------------------------
 # parser construction
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -84,7 +112,8 @@ def _build_parser() -> argparse.ArgumentParser:
     Returns
     -------
     argparse.ArgumentParser
-        Configured parser with subcommands: parse-hl7, parse-fhir, transform.
+        Configured parser with subcommands: parse-hl7, parse-fhir, transform,
+        to-fhir, to-rdf.
 
     Raises
     ------
@@ -115,23 +144,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    # parse-hl7
     s1 = sub.add_parser("parse-hl7", help="Parse an HL7 v2 message file.")
     s1.add_argument(
         "path",
         type=Path,
         help='Path to HL7 v2 message file. Use "-" to read from stdin.',
     )
-
-    # parse-fhir
     s2 = sub.add_parser("parse-fhir", help="Parse a FHIR JSON or XML file.")
     s2.add_argument(
         "path",
         type=Path,
         help="Path to FHIR resource file (.json or .xml).",
     )
-
-    # transform
     s3 = sub.add_parser("transform", help="Transform HL7 v2 to FHIR resources.")
     s3.add_argument(
         "path",
@@ -160,21 +184,58 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Pretty-print JSON output (for stdout or files).",
     )
-
     s4 = sub.add_parser(
-        "to-rdf", help="Transform HL7 v2 to FHIR and serialize to RDF/Turtle."
+        "to-fhir",
+        help=(
+            "Transform HL7 v2 to a FHIR Bundle (JSON) and write to disk. "
+            "Stage 1 of the HL7 -> FHIR Bundle -> RDF/Turtle pipeline."
+        ),
     )
     s4.add_argument(
-        "path", type=Path, help='Path to HL7 v2 message file. Use "-" for stdin.'
+        "path",
+        type=Path,
+        help='Path to HL7 v2 message file. Use "-" for stdin.',
     )
     s4.add_argument(
         "-o",
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory to write .ttl output.",
+        help="Directory to write .json Bundle output.",
     )
     s4.add_argument(
+        "--stdout",
+        action="store_true",
+        help="Write Bundle JSON to stdout instead of to a file.",
+    )
+    s4.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output.",
+    )
+    s5 = sub.add_parser(
+        "to-rdf",
+        help=(
+            "Serialize to RDF/Turtle. Accepts an HL7 v2 .hl7 file (single-stage) "
+            "or a FHIR Bundle .json file produced by to-fhir (stage 2 of pipeline)."
+        ),
+    )
+    s5.add_argument(
+        "path",
+        type=Path,
+        help=(
+            "Path to an HL7 v2 .hl7 file or a FHIR Bundle .json file. "
+            'Use "-" for stdin (HL7 only).'
+        ),
+    )
+    s5.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory to write .ttl output.",
+    )
+    s5.add_argument(
         "--stdout",
         action="store_true",
         help="Write Turtle to stdout instead of to a file.",
@@ -183,9 +244,9 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # validation helpers
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def _validate_existing_file(path: Path, allow_stdin: bool = False) -> None:
@@ -506,9 +567,113 @@ def _write_resources_to_stdout(resources: Iterable[Any], pretty: bool) -> None:
     sys.stdout.flush()
 
 
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# FHIR Bundle helpers
+# ------------------------------------------------------------------------------
+
+
+def _build_fhir_bundle_json(resources: List[Any], pretty: bool) -> str:
+    """
+    Wrap a list of FHIR resource objects into a FHIR Bundle (type: collection).
+
+    The bundle is assembled as a plain dict and serialized to JSON using
+    _resource_to_json_str for each entry resource. This avoids a dependency on
+    fhir.resources.bundle, whose API varies across fhir.resources versions.
+
+    Parameters
+    ----------
+    resources : list
+        FHIR resource instances (pydantic models from fhir.resources).
+    pretty : bool
+        If True, indent the JSON output.
+
+    Returns
+    -------
+    str
+        FHIR Bundle JSON string with resourceType "Bundle" and type "collection".
+
+    Raises
+    ------
+    HL7FHIRToolError
+        If any resource cannot be serialized to JSON.
+    """
+    entries = []
+    for res in resources:
+        res_json_str = _resource_to_json_str(res, pretty=False)
+        try:
+            res_dict = json.loads(res_json_str)
+        except json.JSONDecodeError as e:
+            raise HL7FHIRToolError(
+                f"Failed to parse resource JSON during Bundle assembly: {e}"
+            ) from e
+        entries.append({"resource": res_dict})
+
+    bundle = {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": entries,
+    }
+    return json.dumps(bundle, indent=2 if pretty else None)
+
+
+def _load_resources_from_bundle_json(bundle_json_str: str) -> List[Any]:
+    """
+    Parse a FHIR Bundle JSON string and return a list of reconstructed resource objects.
+
+    Each entry's resource dict is dispatched on resourceType and reconstructed
+    using the corresponding fhir.resources class from _FHIR_RESOURCE_CLASSES.
+    Unknown resource types are silently skipped, matching the behavior of
+    serialize_resources.
+
+    Parameters
+    ----------
+    bundle_json_str : str
+        FHIR Bundle JSON string as produced by _build_fhir_bundle_json.
+
+    Returns
+    -------
+    list
+        Reconstructed fhir.resources instances in entry order.
+
+    Raises
+    ------
+    HL7FHIRToolError
+        If the JSON is malformed or the top-level resourceType is not "Bundle".
+    """
+    try:
+        bundle_dict = json.loads(bundle_json_str)
+    except json.JSONDecodeError as e:
+        raise HL7FHIRToolError(f"Invalid JSON in FHIR Bundle file: {e}") from e
+
+    if bundle_dict.get("resourceType") != "Bundle":
+        raise HL7FHIRToolError(
+            f"Expected resourceType 'Bundle', got '{bundle_dict.get('resourceType')}'"
+        )
+
+    resources = []
+    for entry in bundle_dict.get("entry", []):
+        res_dict = entry.get("resource", {})
+        rtype = res_dict.get("resourceType")
+        cls = _FHIR_RESOURCE_CLASSES.get(rtype)
+        if cls is None:
+            LOG.debug("Skipping unknown resourceType '%s' in Bundle entry", rtype)
+            continue
+        try:
+            validate = getattr(cls, "model_validate", None) or getattr(
+                cls, "parse_obj", None
+            )
+            if callable(validate):
+                resources.append(validate(res_dict))
+            else:
+                resources.append(cls(**res_dict))
+        except Exception as e:
+            LOG.warning("Failed to reconstruct %s from Bundle entry: %s", rtype, e)
+    return resources
+
+
+# ------------------------------------------------------------------------------
 # hl7 parse helper
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def _parse_hl7_for_cli(content: str) -> Message:
@@ -522,6 +687,21 @@ def _parse_hl7_for_cli(content: str) -> Message:
 
     The fallback also enables find_groups=True for ORM^O01 and ORU^R01, which
     require group inference to avoid "PID is not a valid child" errors.
+
+    Parameters
+    ----------
+    content : str
+        Raw HL7 v2 message text.
+
+    Returns
+    -------
+    Message
+        Parsed hl7apy Message object.
+
+    Raises
+    ------
+    HL7FHIRToolError
+        If both strict and tolerant parsing fail.
     """
     try:
         return parse_hl7_v2(content)
@@ -550,9 +730,9 @@ def _parse_hl7_for_cli(content: str) -> Message:
         ) from tolerant_exc
 
 
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # command handlers
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def _cmd_parse_hl7(path: Path) -> int:
@@ -675,18 +855,106 @@ def _cmd_transform(
     return EXIT_OK
 
 
+def _cmd_to_fhir(
+    path: Path,
+    output_dir: Optional[Path],
+    to_stdout: bool,
+    pretty: bool,
+) -> int:
+    """
+    To-fhir: transform an HL7 v2 message into a FHIR Bundle JSON file.
+
+    This is stage 1 of the two-stage pipeline:
+        HL7 v2 -> FHIR Bundle JSON (to-fhir)
+        FHIR Bundle JSON -> RDF/Turtle (to-rdf)
+
+    The output is a FHIR Bundle (type: collection) containing one entry per
+    resource produced by the transformer. The Bundle file is written to
+    out_dir/<stem>.json where stem is derived from the input filename.
+
+    Parameters
+    ----------
+    path : Path
+        Path to HL7 v2 message file, or "-" for stdin.
+    output_dir : Path or None
+        Directory to write the .json Bundle file when not writing to stdout.
+    to_stdout : bool
+        If True, write Bundle JSON to stdout.
+    pretty : bool
+        If True, pretty-print the JSON output.
+
+    Returns
+    -------
+    int
+        EXIT_OK on success.
+
+    Raises
+    ------
+    HL7FHIRToolError
+        For invalid input, missing transformer, or unwritable output.
+    """
+    _validate_existing_file(path, allow_stdin=True)
+    _validate_output_mode(output_dir, to_stdout)
+
+    content = _read_text_input(path)
+    msg = _parse_hl7_for_cli(content)
+
+    xform = get_transformer(msg)
+    if not xform:
+        raise HL7FHIRToolError("No transformer registered for this HL7 message type.")
+
+    resources = list(xform.transform(msg))
+    bundle_json = _build_fhir_bundle_json(resources, pretty=pretty)
+
+    if to_stdout:
+        sys.stdout.write(bundle_json)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        return EXIT_OK
+
+    cfg = load_config(None)
+    out_dir = output_dir or cfg.default_output_dir
+    _validate_output_mode(out_dir, to_stdout=False)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    stem = path.stem if str(path) != "-" else "output"
+    out_path = out_dir / f"{stem}.json"
+    try:
+        out_path.write_text(bundle_json, encoding="utf-8")
+    except OSError as e:
+        raise HL7FHIRToolError(f"Failed to write {out_path}: {e}") from e
+
+    LOG.info("Wrote %s (%d resources)", out_path, len(resources))
+    print(f"Wrote {out_path} ({len(resources)} resources)")
+    return EXIT_OK
+
+
 def _cmd_to_rdf(
     path: Path,
     output_dir: Optional[Path],
     to_stdout: bool,
 ) -> int:
     """
-    To-rdf: run the full HL7 -> FHIR -> RDF pipeline and emit Turtle output.
+    To-rdf: serialize to RDF/Turtle.
+
+    Accepts either:
+    - An HL7 v2 .hl7 file (single-stage: HL7 -> RDF)
+    - A FHIR Bundle .json file produced by to-fhir (stage 2 of pipeline)
+
+    Input type is detected by file suffix. When the input is a .json file,
+    resources are loaded from the Bundle via _load_resources_from_bundle_json
+    and passed directly to serialize_resources, bypassing HL7 parsing. This
+    makes the two-stage pipeline explicit and auditable:
+        HL7 v2 -> FHIR Bundle JSON (to-fhir)
+        FHIR Bundle JSON -> RDF/Turtle (to-rdf)
+
+    Stdin is always treated as HL7.
 
     Parameters
     ----------
     path : Path
-        Path to HL7 v2 message file, or "-" for stdin.
+        Path to an HL7 v2 .hl7 file or a FHIR Bundle .json file, or "-" for
+        stdin (HL7 only).
     output_dir : Path or None
         Directory to write the .ttl file when not writing to stdout.
     to_stdout : bool
@@ -705,14 +973,24 @@ def _cmd_to_rdf(
     _validate_existing_file(path, allow_stdin=True)
     _validate_output_mode(output_dir, to_stdout)
 
-    content = _read_text_input(path)
-    msg = _parse_hl7_for_cli(content)
+    # Detect input type by suffix. Stdin is always treated as HL7.
+    is_fhir_bundle = str(path) != "-" and path.suffix.lower() == ".json"
 
-    xform = get_transformer(msg)
-    if not xform:
-        raise HL7FHIRToolError("No transformer registered for this HL7 message type.")
+    if is_fhir_bundle:
+        # Stage 2: load from FHIR Bundle JSON produced by to-fhir
+        bundle_json_str = _read_text_input(path)
+        resources = _load_resources_from_bundle_json(bundle_json_str)
+    else:
+        # Single-stage or stdin: parse HL7 directly
+        content = _read_text_input(path)
+        msg = _parse_hl7_for_cli(content)
+        xform = get_transformer(msg)
+        if not xform:
+            raise HL7FHIRToolError(
+                "No transformer registered for this HL7 message type."
+            )
+        resources = list(xform.transform(msg))
 
-    resources = list(xform.transform(msg))
     graph = serialize_resources(resources)
     turtle = graph.serialize(format="turtle")
 
@@ -734,14 +1012,14 @@ def _cmd_to_rdf(
     except OSError as e:
         raise HL7FHIRToolError(f"Failed to write {out_path}: {e}") from e
 
-    LOG.info("Wrote %s  (%d triples)", out_path, len(graph))
-    print(f"Wrote {out_path}  ({len(graph)} triples)")
+    LOG.info("Wrote %s (%d triples)", out_path, len(graph))
+    print(f"Wrote {out_path} ({len(graph)} triples)")
     return EXIT_OK
 
 
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # main
-# -------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -781,9 +1059,18 @@ def main(argv: Optional[list[str]] = None) -> int:
                 to_stdout=bool(args.stdout),
                 pretty=bool(args.pretty),
             )
+        if args.cmd == "to-fhir":
+            return _cmd_to_fhir(
+                path=args.path,
+                output_dir=args.output_dir,
+                to_stdout=bool(args.stdout),
+                pretty=bool(args.pretty),
+            )
         if args.cmd == "to-rdf":
             return _cmd_to_rdf(
-                path=args.path, output_dir=args.output_dir, to_stdout=bool(args.stdout)
+                path=args.path,
+                output_dir=args.output_dir,
+                to_stdout=bool(args.stdout),
             )
 
         parser.error("Unknown command")  # defensive, should not happen

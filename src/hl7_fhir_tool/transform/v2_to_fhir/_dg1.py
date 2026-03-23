@@ -29,6 +29,19 @@ _SYSTEM_MAP: dict[str, str] = {
 }
 _DEFAULT_SYSTEM = "http://hl7.org/fhir/sid/icd-10"
 
+# clinicalStatus is required by FHIR R5 Condition. We default to "active" for
+# all conditions derived from DG1 segments, as the HL7 v2 DG1 segment does not
+# carry an equivalent lifecycle status field.
+_CLINICAL_STATUS_ACTIVE = CodeableConcept(
+    coding=[
+        Coding(
+            system="http://terminology.hl7.org/CodeSystem/condition-clinical",
+            code="active",
+            display="Active",
+        )
+    ]
+)
+
 
 # ------------------------------------------------------------------------------
 # ER7 helpers
@@ -205,6 +218,9 @@ def _build_condition_from_dg1(
     structured hl7apy attribute access when the line is absent. Returns None if
     no diagnosis code can be extracted.
 
+    clinicalStatus is set to "active" for all conditions. FHIR R5 requires this
+    field and HL7 v2 DG1 has no equivalent lifecycle field.
+
     Parameters
     ----------
     dg1_seg : object or None
@@ -287,6 +303,7 @@ def _build_condition_from_dg1(
     cond.id = f"cond-{patient_id}-{ordinal}"
     cond.code = code_cc
     cond.subject = Reference(reference=f"Patient/{patient_id}")
+    cond.clinicalStatus = _CLINICAL_STATUS_ACTIVE
 
     return cond
 

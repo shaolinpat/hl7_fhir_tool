@@ -150,7 +150,7 @@ def test_first_coding_uri_no_system_uses_default():
         coding=[types.SimpleNamespace(code="GLU", system=None)]
     )
     uri = _first_coding_uri(concept)
-    assert uri == URIRef("http://example.org/code/GLU")
+    assert uri == URIRef("http://loinc.org/GLU")
 
 
 def test_first_coding_uri_r5_concept_nesting():
@@ -330,7 +330,7 @@ def test_add_encounter_full():
 def test_add_encounter_no_subject():
     g = _graph()
     resource = types.SimpleNamespace(
-        id="enc-2", identifier=None, status="finished", subject=None
+        id="visit-2", identifier=None, status="finished", subject=None
     )
     _add_encounter(g, resource)
     assert not any(p == HFT.encounterSubject for s, p, o in g)
@@ -348,10 +348,19 @@ def test_add_encounter_no_status():
 def test_add_encounter_subject_ref_no_slash():
     g = _graph()
     resource = types.SimpleNamespace(
-        id="enc-4",
+        id="visit-4",
         identifier=None,
         status=None,
         subject=types.SimpleNamespace(reference="PatientNoSlash"),
+    )
+    _add_encounter(g, resource)
+    assert not any(p == HFT.encounterSubject for s, p, o in g)
+
+
+def test_patient_uri_from_encounter_empty_after_prefix():
+    g = _graph()
+    resource = types.SimpleNamespace(
+        id="enc-", identifier=None, status=None, subject=None
     )
     _add_encounter(g, resource)
     assert not any(p == HFT.encounterSubject for s, p, o in g)
@@ -822,3 +831,48 @@ def test_serialize_resources_no_resource_type_skipped():
     resource = types.SimpleNamespace(resource_type=None, resourceType=None)
     g = serialize_resources([resource])
     assert len(g) == 0
+
+
+def test_serialize_resources_hasCondition_linked():
+    encounter = types.SimpleNamespace(
+        resource_type="Encounter",
+        id="enc-p1",
+        identifier=None,
+        status=None,
+        subject=None,
+    )
+    condition = types.SimpleNamespace(
+        resource_type="Condition",
+        id="cond-1",
+        identifier=None,
+        subject=types.SimpleNamespace(reference="Patient/p1"),
+        code=None,
+    )
+    g = serialize_resources([encounter, condition])
+    enc_uri = HFT["Encounter_enc-p1"]
+    cond_uri = HFT["Condition_cond-1"]
+    assert (enc_uri, HFT.hasCondition, cond_uri) in g
+
+
+def test_serialize_resources_encounter_no_derivable_patient():
+    encounter = types.SimpleNamespace(
+        resource_type="Encounter",
+        id="visit-999",
+        identifier=None,
+        status=None,
+        subject=None,
+    )
+    g = serialize_resources([encounter])
+    assert not any(p == HFT.hasCondition for s, p, o in g)
+
+
+def test_serialize_resources_condition_subject_ref_no_slash():
+    condition = types.SimpleNamespace(
+        resource_type="Condition",
+        id="cond-x",
+        identifier=None,
+        subject=types.SimpleNamespace(reference="PatientNoSlash"),
+        code=None,
+    )
+    g = serialize_resources([condition])
+    assert not any(p == HFT.hasCondition for s, p, o in g)

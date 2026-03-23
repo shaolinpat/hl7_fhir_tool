@@ -123,7 +123,9 @@ def test_transform_minimal():
     assert str(patient.birthDate) == "1980-01-01"
     assert patient.gender == "female"
     assert encounter.status == "in-progress"
-    assert encounter.class_fhir.coding and encounter.class_fhir.coding[0].code == "I"
+    assert (
+        encounter.class_fhir[0].coding and encounter.class_fhir[0].coding[0].code == "I"
+    )
     assert encounter.id == "enc-12345"
     assert getattr(encounter, "period", None) is None
 
@@ -141,7 +143,7 @@ def test_transform_with_visit_and_period():
     assert patient.gender == "male"
     assert encounter.id == "V999"
     assert encounter.status == "in-progress"
-    assert encounter.class_fhir.coding[0].code == "O"
+    assert encounter.class_fhir[0].coding[0].code == "O"
     assert encounter.period.start == "2025-01-01"
     assert encounter.period.end == "2025-01-02"
 
@@ -156,7 +158,9 @@ def test_transform_missing_pid_is_tolerant():
     assert getattr(patient, "id", None) is None
     assert encounter.id == "enc-unknown"
     assert encounter.status == "in-progress"
-    assert encounter.class_fhir.coding and encounter.class_fhir.coding[0].code == "E"
+    assert (
+        encounter.class_fhir[0].coding and encounter.class_fhir[0].coding[0].code == "E"
+    )
 
 
 def test_transform_gender_unknown_mapping():
@@ -266,7 +270,7 @@ def test_transform_pv1_class_and_id_via_plain_strings_not_to_er7():
     patient.id = "X9"
     enc = xf._build_encounter(PV1Plain(), patient)
 
-    assert enc.class_fhir.coding and enc.class_fhir.coding[0].code == "O"
+    assert enc.class_fhir[0].coding and enc.class_fhir[0].coding[0].code == "O"
     assert enc.id == "VPLAIN"
 
 
@@ -282,7 +286,7 @@ def test_transform_pv1_fields_present_but_empty_strings():
     patient.id = "E1"
     enc = xf._build_encounter(PV1Empty(), patient)
 
-    assert enc.class_fhir.coding == []
+    assert enc.class_fhir[0].coding == []
     assert enc.id == "enc-E1"
 
 
@@ -294,7 +298,7 @@ def test_transform_no_pv1_sets_empty_class_and_fallback_id():
     _, encounter = xf.transform(msg)
 
     assert encounter.id == "enc-55555"
-    assert encounter.class_fhir.coding == []
+    assert encounter.class_fhir[0].coding == []
 
 
 def test_transform_pid_parsing_error_path_logs_and_recovers():

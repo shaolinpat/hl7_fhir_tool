@@ -4,8 +4,6 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import List, Optional
 
-from hl7apy.core import Message
-
 from fhir.resources.codeableconcept import CodeableConcept
 from fhir.resources.coding import Coding
 from fhir.resources.encounter import Encounter
@@ -13,9 +11,9 @@ from fhir.resources.humanname import HumanName
 from fhir.resources.patient import Patient
 from fhir.resources.period import Period
 from fhir.resources.resource import Resource
+from hl7apy.core import Message
 
 from ..registry import register
-
 from ._dg1 import build_conditions
 
 import logging
@@ -313,9 +311,10 @@ class ADTA08Transformer:
         if enc_class is None:
             enc_class = CodeableConcept.model_construct(coding=[])
 
+        # class_fhir is required by FHIR R5 as a list
         return EncounterWithPeriod.model_construct(
             status="in-progress",
-            class_fhir=enc_class,
+            class_fhir=[enc_class],
             id=encounter_id,
             period=(
                 Period.model_construct(start=start, end=end) if start or end else None

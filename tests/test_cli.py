@@ -577,6 +577,207 @@ def test_cmd_to_rdf_write_fails(tmp_path, monkeypatch):
 
 
 # ------------------------------------------------------------------------------
+# _build_fhir_bundle_json
+# ------------------------------------------------------------------------------
+
+
+def test_build_fhir_bundle_json_produces_valid_bundle():
+    class R:
+        resource_type = "Patient"
+
+        def model_dump_json(self, **k):
+            return _json.dumps({"resourceType": "Patient", "id": "p1"})
+
+    result = cli._build_fhir_bundle_json([R()], pretty=False)
+    bundle = _json.loads(result)
+    assert bundle["resourceType"] == "Bundle"
+    assert bundle["type"] == "collection"
+    assert bundle["entry"][0]["resource"]["resourceType"] == "Patient"
+
+
+def test_build_fhir_bundle_json_pretty():
+    class R:
+        resource_type = "Patient"
+
+        def model_dump_json(self, **k):
+            return _json.dumps({"resourceType": "Patient"})
+
+    result = cli._build_fhir_bundle_json([R()], pretty=True)
+    assert "\n" in result
+
+
+def test_build_fhir_bundle_json_decode_error():
+    class R:
+        resource_type = "Patient"
+
+        def model_dump_json(self, **k):
+            return "{not valid json"
+
+    with pytest.raises(cli.HL7FHIRToolError, match="Failed to parse resource JSON"):
+        cli._build_fhir_bundle_json([R()], pretty=False)
+
+
+# ------------------------------------------------------------------------------
+# _load_resources_from_bundle_json
+# ------------------------------------------------------------------------------
+
+
+def test_load_resources_from_bundle_json_happy_path():
+    bundle = _json.dumps(
+        {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "entry": [{"resource": {"resourceType": "Patient", "id": "p1"}}],
+        }
+    )
+    resources = cli._load_resources_from_bundle_json(bundle)
+    assert len(resources) == 1
+    assert getattr(resources[0], "resource_type", None) == "Patient"
+
+
+def test_load_resources_from_bundle_json_malformed_json():
+    with pytest.raises(cli.HL7FHIRToolError, match="Invalid JSON in FHIR Bundle file"):
+        cli._load_resources_from_bundle_json("{not json")
+
+
+def test_load_resources_from_bundle_json_wrong_resource_type():
+    with pytest.raises(cli.HL7FHIRToolError, match="Expected resourceType 'Bundle'"):
+        cli._load_resources_from_bundle_json(
+            _json.dumps({"resourceType": "Patient", "id": "p1"})
+        )
+
+
+def test_load_resources_from_bundle_json_unknown_type_skipped():
+    bundle = _json.dumps(
+        {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "entry": [
+                {"resource": {"resourceType": "UnknownThing", "id": "x1"}},
+                {"resource": {"resourceType": "Patient", "id": "p1"}},
+            ],
+        }
+    )
+    resources = cli._load_resources_from_bundle_json(bundle)
+    assert len(resources) == 1
+    assert getattr(resources[0], "resource_type", None) == "Patient"
+
+
+def test_load_resources_from_bundle_json_reconstruction_failure_skipped(monkeypatch):
+    class BoomPatient:
+        @classmethod
+        def model_validate(cls, data):
+            raise ValueError("bad data")
+
+        @classmethod
+        def parse_obj(cls, data):
+            raise ValueError("bad data")
+
+    monkeypatch.setitem(cli._FHIR_RESOURCE_CLASSES, "Patient", BoomPatient)
+    bundle = _json.dumps(
+        {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "entry": [{"resource": {"resourceType": "Patient", "id": "p1"}}],
+        }
+    )
+    resources = cli._load_resources_from_bundle_json(bundle)
+    assert resources == []
+
+
+def test_load_resources_from_bundle_json_no_validate_method(monkeypatch):
+    class NoValidatePatient:
+        resource_type = "Patient"
+
+        def __init__(self, **kwargs):
+            self.resource_type = "Patient"
+
+    monkeypatch.setitem(cli._FHIR_RESOURCE_CLASSES, "Patient", NoValidatePatient)
+    bundle = _json.dumps(
+        {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "entry": [{"resource": {"resourceType": "Patient", "id": "p1"}}],
+        }
+    )
+    resources = cli._load_resources_from_bundle_json(bundle)
+    assert len(resources) == 1
+    assert resources[0].resource_type == "Patient"
+
+
+# ------------------------------------------------------------------------------
+# _cmd_to_fhir
+# ------------------------------------------------------------------------------
+
+
+def test_cmd_to_fhir_stdout(tmp_path, capsys):
+    p = write_hl7(tmp_path)
+    code = cli.main(["to-fhir", str(p), "--stdout"])
+    out, _ = capsys.readouterr()
+    assert code == cli.EXIT_OK
+    bundle = _json.loads(out)
+    assert bundle["resourceType"] == "Bundle"
+    assert len(bundle["entry"]) > 0
+
+
+def test_cmd_to_fhir_writes_file(tmp_path):
+    p = write_hl7(tmp_path)
+    out_dir = tmp_path / "fhir_out"
+    code = cli.main(["to-fhir", str(p), "-o", str(out_dir)])
+    assert code == cli.EXIT_OK
+    bundle_file = out_dir / "msg.json"
+    assert bundle_file.exists()
+    bundle = _json.loads(bundle_file.read_text(encoding="utf-8"))
+    assert bundle["resourceType"] == "Bundle"
+    assert len(bundle["entry"]) > 0
+
+
+def test_cmd_to_fhir_no_transformer(tmp_path):
+    p = tmp_path / "unknown.hl7"
+    p.write_text(
+        "MSH|^~\\&|HIS|RIH|EKG|EKG|20250101123000||ADT^A99|MSG00001|P|2.5.1\r"
+        "EVN|A99|20250101123000\r"
+        "PID|1||12345^^^MRN||Doe^John||19700101|M\r",
+        encoding="utf-8",
+    )
+    code = cli.main(["to-fhir", str(p), "--stdout"])
+    assert code == cli.EXIT_ERR
+
+
+def test_cmd_to_fhir_write_fails(tmp_path, monkeypatch):
+    p = write_hl7(tmp_path)
+    out_dir = tmp_path / "fhir_out"
+    real_write = Path.write_text
+
+    def boom(self, *a, **k):
+        if self.suffix == ".json":
+            raise OSError("disk-full")
+        return real_write(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    code = cli.main(["to-fhir", str(p), "-o", str(out_dir)])
+    assert code == cli.EXIT_ERR
+
+
+# ------------------------------------------------------------------------------
+# _cmd_to_rdf
+# ------------------------------------------------------------------------------
+
+
+def test_cmd_to_rdf_reads_fhir_bundle_json(tmp_path):
+    p = write_hl7(tmp_path)
+    fhir_dir = tmp_path / "fhir"
+    assert cli.main(["to-fhir", str(p), "-o", str(fhir_dir)]) == cli.EXIT_OK
+    bundle_file = fhir_dir / "msg.json"
+    rdf_dir = tmp_path / "rdf_out"
+    code = cli.main(["to-rdf", str(bundle_file), "-o", str(rdf_dir)])
+    assert code == cli.EXIT_OK
+    ttl = rdf_dir / "msg.ttl"
+    assert ttl.exists()
+    assert "@prefix hft:" in ttl.read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------------------
 # main()
 # ------------------------------------------------------------------------------
 

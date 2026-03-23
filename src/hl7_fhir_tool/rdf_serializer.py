@@ -21,8 +21,9 @@ Usage
 
 from __future__ import annotations
 
+from collections import defaultdict
 from decimal import Decimal, InvalidOperation
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 from rdflib import Graph, Literal, Namespace, RDF, URIRef, XSD
 from rdflib.namespace import RDFS
@@ -136,7 +137,7 @@ def _first_coding_uri(code_obj) -> Optional[URIRef]:
     for coding in coding_list:
         code_val = _safe_get(coding, "code")
         if code_val:
-            system = _safe_get(coding, "system") or "http://example.org/code"
+            system = _safe_get(coding, "system") or "http://loinc.org"
             return URIRef(f"{system}/{code_val}")
     return None
 
@@ -162,6 +163,41 @@ def _add_identifiers(g: Graph, subj: URIRef, resource) -> None:
         val = _safe_get(ident, "value")
         if val:
             g.add((subj, HFT.identifier, Literal(str(val), datatype=XSD.string)))
+
+
+def _patient_uri_from_encounter(resource) -> Optional[URIRef]:
+    """
+    Derive the Patient URI for an Encounter.
+
+    Tries resource.subject.reference first (FHIR standard). Falls back to
+    extracting the patient id from the encounter id, which follows the
+    convention enc-{patient_id} used by all ADT transformers in this project.
+
+    Parameters
+    ----------
+    resource : object
+        FHIR Encounter resource instance.
+
+    Returns
+    -------
+    URIRef or None
+        hft:Patient_{id} URI, or None if it cannot be determined.
+    """
+    # Prefer explicit subject reference
+    ref_str = _safe_get(resource, "subject", "reference")
+    if ref_str:
+        uri = _ref_to_uri(ref_str)
+        if uri:
+            return uri
+
+    # Fall back: enc-{patient_id} convention
+    enc_id = getattr(resource, "id", None) or ""
+    if enc_id.startswith("enc-"):
+        patient_id = enc_id[4:]
+        if patient_id:
+            return HFT[f"Patient_{patient_id}"]
+
+    return None
 
 
 # ------------------------------------------------------------------------------
@@ -226,6 +262,10 @@ def _add_encounter(g: Graph, resource) -> URIRef:
     Types the resource as hft:Encounter and emits triples for hft:identifier,
     hft:status, and hft:encounterSubject.
 
+    The patient URI is derived via _patient_uri_from_encounter, which checks
+    resource.subject.reference first and falls back to the enc-{patient_id}
+    id convention used by all ADT transformers in this project.
+
     Parameters
     ----------
     g : Graph
@@ -248,11 +288,9 @@ def _add_encounter(g: Graph, resource) -> URIRef:
     if status:
         g.add((subj, HFT.status, Literal(str(status), datatype=XSD.string)))
 
-    ref_str = _safe_get(resource, "subject", "reference")
-    if ref_str:
-        pat_uri = _ref_to_uri(ref_str)
-        if pat_uri:
-            g.add((subj, HFT.encounterSubject, pat_uri))
+    pat_uri = _patient_uri_from_encounter(resource)
+    if pat_uri:
+        g.add((subj, HFT.encounterSubject, pat_uri))
 
     return subj
 
@@ -503,6 +541,11 @@ def serialize_resources(
     fhir: class) and annotated with hft: data and object properties as defined
     in hl7_fhir_tool_schema.ttl. Unknown resource types are silently skipped.
 
+    After individual resource serialization, a second pass adds
+    hft:hasCondition triples linking each Encounter to all Conditions that
+    share the same patient subject. This mirrors the FHIR Encounter.diagnosis
+    relationship and is required by the cohort SPARQL queries.
+
     Parameters
     ----------
     resources : Iterable
@@ -528,14 +571,43 @@ def serialize_resources(
     g.bind("rdf", RDF)
     g.bind("rdfs", RDFS)
 
-    for resource in resources:
+    # Collect encounter and condition URIs keyed by patient URI for the
+    # second-pass hft:hasCondition linking step.
+    encounter_by_patient: dict[URIRef, List[URIRef]] = defaultdict(list)
+    condition_by_patient: dict[URIRef, List[URIRef]] = defaultdict(list)
+
+    resource_list = list(resources)
+
+    for resource in resource_list:
         rtype = (
             getattr(resource, "resource_type", None)
             or getattr(resource, "resourceType", None)
             or type(resource).__name__
         )
         handler = _HANDLERS.get(str(rtype) if rtype else "")
-        if handler:
-            handler(g, resource)
+        if not handler:
+            continue
+
+        subj = handler(g, resource)
+
+        # Track encounters and conditions by patient for second pass.
+        if str(rtype) == "Encounter":
+            pat_uri = _patient_uri_from_encounter(resource)
+            if pat_uri:
+                encounter_by_patient[pat_uri].append(subj)
+
+        elif str(rtype) == "Condition":
+            ref_str = _safe_get(resource, "subject", "reference")
+            if ref_str:
+                pat_uri = _ref_to_uri(ref_str)
+                if pat_uri:
+                    condition_by_patient[pat_uri].append(subj)
+
+    # Second pass: link each Encounter to all Conditions sharing its patient.
+    for pat_uri, enc_uris in encounter_by_patient.items():
+        cond_uris = condition_by_patient.get(pat_uri, [])
+        for enc_uri in enc_uris:
+            for cond_uri in cond_uris:
+                g.add((enc_uri, HFT.hasCondition, cond_uri))
 
     return g

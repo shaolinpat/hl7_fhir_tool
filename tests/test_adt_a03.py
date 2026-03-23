@@ -44,8 +44,8 @@ def test_transform_minimal_sets_patient_and_encounter(transformer: ADTA03Transfo
 
     assert encounter.status == "finished"
     assert encounter.class_fhir is not None
-    assert isinstance(encounter.class_fhir.coding[0], Coding)
-    assert encounter.class_fhir.coding[0].code == "I"
+    assert isinstance(encounter.class_fhir[0].coding[0], Coding)
+    assert encounter.class_fhir[0].coding[0].code == "I"
 
 
 def test_transform_sets_period_when_pv1_44_45_present(transformer: ADTA03Transformer):
@@ -191,7 +191,7 @@ def test_transform_pv1_missing(transformer: ADTA03Transformer):
     _, encounter = transformer.transform(msg)
     assert isinstance(encounter, Encounter)
     assert encounter.period is None
-    assert encounter.class_fhir.coding == []
+    assert encounter.class_fhir[0].coding == []
 
 
 def test_transform_pv1_missing_class_and_visit(transformer: ADTA03Transformer):
@@ -205,7 +205,7 @@ def test_transform_pv1_missing_class_and_visit(transformer: ADTA03Transformer):
     msg = _pm(raw)
     _, encounter = transformer.transform(msg)
     assert encounter.id.startswith("enc-")
-    assert encounter.class_fhir.coding == []
+    assert encounter.class_fhir[0].coding == []
 
 
 def test_transform_invalid_hl7_ts(transformer: ADTA03Transformer):
@@ -247,8 +247,8 @@ def test_transform_parse_hl7_ts_invalid_dates(transformer: ADTA03Transformer):
     _, encounter = transformer.transform(msg)
     assert encounter.period is None
     assert encounter.class_fhir is not None
-    if encounter.class_fhir.coding:
-        assert encounter.class_fhir.coding[0].code == "I"
+    if encounter.class_fhir[0].coding:
+        assert encounter.class_fhir[0].coding[0].code == "I"
 
 
 def test_transform_missing_pid3_and_pid5(transformer: ADTA03Transformer):
@@ -264,8 +264,8 @@ def test_transform_missing_pid3_and_pid5(transformer: ADTA03Transformer):
     assert patient.id is None
     assert patient.name is None
     assert encounter.class_fhir is not None
-    if encounter.class_fhir.coding:
-        assert encounter.class_fhir.coding[0].code == "I"
+    if encounter.class_fhir[0].coding:
+        assert encounter.class_fhir[0].coding[0].code == "I"
 
 
 def test_transform_parse_hl7_ts_exception_branch(transformer: ADTA03Transformer):

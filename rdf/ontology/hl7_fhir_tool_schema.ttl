@@ -1,15 +1,22 @@
-@prefix : <https://w3id.org/shaolinpat/hft#> .
-@prefix hft: <https://w3id.org/shaolinpat/hft#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix xml: <http://www.w3.org/XML/1998/namespace> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix :     <https://w3id.org/shaolinpat/hft#> .
+@prefix hft:  <https://w3id.org/shaolinpat/hft#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml:  <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix fhir: <http://hl7.org/fhir/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
 @base <https://w3id.org/shaolinpat/hft#> .
 
 <https://w3id.org/shaolinpat/hft#> rdf:type owl:Ontology ;
-                                     owl:imports <file:/home/pbeach/Dropbox/VT-MIT/Projects/hl7_fhir_tool/outputs/fhir/fhir_events.ttl> .
+    owl:versionInfo "0.2.0" ;
+    dct:title "HL7 FHIR Tool Ontology" ;
+    dct:description "OWL 2 ontology extending FHIR RDF for HL7 v2 ADT/ORU/ORM message parsing and RDF serialization." ;
+    dct:creator "Patrick Beach" ;
+    dct:date "2026-03-22" ;
+    rdfs:seeAlso <https://github.com/shaolinpat/hl7_fhir_tool> ;
+    rdfs:comment "FHIR RDF terms (http://hl7.org/fhir/) are referenced by namespace alignment. The published FHIR RDF specification (http://hl7.org/fhir/fhir.ttl) is not imported directly due to its size; hft: classes and properties are declared as subclasses and subproperties of fhir: terms to maintain alignment." .
 
 #################################################################
 #    Datatypes
@@ -58,7 +65,7 @@ hft:encounterSubject rdf:type owl:ObjectProperty ;
                      rdf:type owl:FunctionalProperty ;
                      rdfs:domain hft:Encounter ;
                      rdfs:range hft:Patient ;
-                     rdfs:comment "Links an Encounter the the Patient it concerns; funcional subPropertyOf hft:hasSubject." ;
+                     rdfs:comment "Links an Encounter to the Patient it concerns; functional subPropertyOf hft:hasSubject." ;
                      rdfs:label "encounter subject" .
 
 
@@ -67,7 +74,7 @@ hft:gender rdf:type owl:ObjectProperty ;
            rdfs:subPropertyOf fhir:gender ;
            rdfs:domain hft:Patient ;
            rdfs:range hft:AdministrativeGenderCode ;
-           rdfs:comment "Administrative gender of the patient, representing the gender recorded for administrative or clinical purposes (male, female, other, unknown). This may differ from gender identity and is used in clinical, epidemiolical, and operational contexts." ;
+           rdfs:comment "Administrative gender of the patient, representing the gender recorded for administrative or clinical purposes (male, female, other, unknown). This may differ from gender identity and is used in clinical, epidemiological, and operational contexts." ;
            rdfs:label "administrative gender" .
 
 
@@ -78,8 +85,14 @@ hft:hasCode rdf:type owl:ObjectProperty ;
                                         hft:Observation
                                       )
                         ] ;
-            rdfs:range rdfs:Resource ;
-            rdfs:comment "Links an Observation or a Condition to its concept code IRI (e.g., LOINC or ICD-10)." ;
+            rdfs:range [ rdf:type owl:Class ;
+                         owl:unionOf ( hft:Condition
+                                       hft:Observation
+                                       <http://loinc.org/>
+                                       <http://hl7.org/fhir/sid/icd-10/>
+                                     )
+                       ] ;
+            rdfs:comment "Links an Observation or Condition to its concept code IRI. Code IRIs are formed as {system}/{code}, e.g., http://loinc.org/4548-4 or http://hl7.org/fhir/sid/icd-10/E11.9." ;
             rdfs:label "has code" .
 
 
@@ -143,28 +156,33 @@ hft:serviceRequestSubject rdf:type owl:ObjectProperty ;
                           rdf:type owl:FunctionalProperty ;
                           rdfs:domain hft:ServiceRequest ;
                           rdfs:range hft:Patient ;
-                          rdfs:comment "Links a ServiceRequest to the Patient it concerns; a functional subProperty of hasSubject" ;
+                          rdfs:comment "Links a ServiceRequest to the Patient it concerns; functional subProperty of hasSubject." ;
                           rdfs:label "service request subject" .
 
 
 ###  http://hl7.org/fhir/DiagnosticReport.result
-fhir:DiagnosticReport.result rdf:type owl:ObjectProperty .
+fhir:DiagnosticReport.result rdf:type owl:ObjectProperty ;
+                             rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/Encounter.reasonReference
-fhir:Encounter.reasonReference rdf:type owl:ObjectProperty .
+fhir:Encounter.reasonReference rdf:type owl:ObjectProperty ;
+                               rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/basedOn
-fhir:basedOn rdf:type owl:ObjectProperty .
+fhir:basedOn rdf:type owl:ObjectProperty ;
+             rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/gender
-fhir:gender rdf:type owl:ObjectProperty .
+fhir:gender rdf:type owl:ObjectProperty ;
+            rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/subject
-fhir:subject rdf:type owl:ObjectProperty .
+fhir:subject rdf:type owl:ObjectProperty ;
+             rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 #################################################################
@@ -246,7 +264,7 @@ hft:status rdf:type owl:DatatypeProperty ;
                                      )
                        ] ;
            rdfs:range xsd:string ;
-           rdfs:comment "Lifecycle status (e.g., DiagnosticReport: retistered|preliminary|final|amended; Encounter, Observation, ServiceRequest similar)." ;
+           rdfs:comment "Lifecycle status (e.g., DiagnosticReport: registered|preliminary|final|amended; Encounter, Observation, ServiceRequest similar)." ;
            rdfs:label "status" .
 
 
@@ -281,21 +299,21 @@ hft:valueString rdf:type owl:DatatypeProperty ;
 ###  https://w3id.org/shaolinpat/hft#AdministrativeGenderCode
 hft:AdministrativeGenderCode rdf:type owl:Class ;
                              rdfs:subClassOf fhir:code ;
-                             rdfs:comment "A coded cconcept representing the administrative gender of a patient. This code is used for clinical, operational, and reporting purpposes and may not correspond to gender idenity.  Permitted values are male, female, other, and unknown." ;
+                             rdfs:comment "A coded concept representing the administrative gender of a patient. This code is used for clinical, operational, and reporting purposes and may not correspond to gender identity. Permitted values are male, female, other, and unknown." ;
                              rdfs:label "Administrative gender code" .
 
 
 ###  https://w3id.org/shaolinpat/hft#Condition
 hft:Condition rdf:type owl:Class ;
               rdfs:subClassOf fhir:Condition ;
-              rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:Condition" ;
+              rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:Condition." ;
               rdfs:label "Condition" .
 
 
 ###  https://w3id.org/shaolinpat/hft#DiagnosticReport
 hft:DiagnosticReport rdf:type owl:Class ;
                      rdfs:subClassOf fhir:DiagnosticReport ;
-                     rdfs:comment "Represents a suspected or diagnosed medical condition, aligned with fhir:DiagnosticReport." ;
+                     rdfs:comment "Represents a diagnostic report, aligned with fhir:DiagnosticReport." ;
                      rdfs:label "Diagnostic report" .
 
 
@@ -335,35 +353,38 @@ hft:ServiceRequest rdf:type owl:Class ;
 
 
 ###  http://hl7.org/fhir/Condition
-fhir:Condition rdf:type owl:Class .
+fhir:Condition rdf:type owl:Class ;
+               rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/DiagnosticReport
-fhir:DiagnosticReport rdf:type owl:Class .
+fhir:DiagnosticReport rdf:type owl:Class ;
+                      rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/Encounter
-fhir:Encounter rdf:type owl:Class .
+fhir:Encounter rdf:type owl:Class ;
+               rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/Observation
-fhir:Observation rdf:type owl:Class .
+fhir:Observation rdf:type owl:Class ;
+                 rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/Patient
-fhir:Patient rdf:type owl:Class .
+fhir:Patient rdf:type owl:Class ;
+             rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/ServiceRequest
-fhir:ServiceRequest rdf:type owl:Class .
+fhir:ServiceRequest rdf:type owl:Class ;
+                    rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 ###  http://hl7.org/fhir/code
-fhir:code rdf:type owl:Class .
-
-
-###  http://www.w3.org/2000/01/rdf-schema#Resource
-rdfs:Resource rdf:type owl:Class .
+fhir:code rdf:type owl:Class ;
+          rdfs:isDefinedBy <http://hl7.org/fhir/> .
 
 
 #################################################################
@@ -387,7 +408,7 @@ hft:male rdf:type owl:NamedIndividual ,
 ###  https://w3id.org/shaolinpat/hft#other
 hft:other rdf:type owl:NamedIndividual ,
                    hft:AdministrativeGenderCode ;
-          rdfs:comment "Indicates that the patient is recorded with a gender other than male or female for administrative or clinical purposes" ;
+          rdfs:comment "Indicates that the patient is recorded with a gender other than male or female for administrative or clinical purposes." ;
           rdfs:label "other gender" .
 
 
@@ -411,6 +432,3 @@ hft:unknown rdf:type owl:NamedIndividual ,
                 hft:ServiceRequest
               )
 ] .
-
-
-###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi
